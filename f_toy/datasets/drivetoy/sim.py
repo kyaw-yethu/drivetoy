@@ -493,14 +493,14 @@ class Sim:
                 if lid in self.gap_lanes:     # v3: spaced by the oncoming headway law
                     s += ln.limit * 0.85 * self.headway(lid)
                 else:
-                    s += rng.uniform(12, 70) / max(density, 0.15)
+                    s += rng.uniform(12, 70) / max(density, 0.15) / ln.inflow_w
             # front to back: a follower must be able to stop behind its leader even if the leader
             # brakes as hard as it can (no RNG draw: scenes where this does not bind stay unchanged)
             on_lane = sorted((u for u in self.vehicles if u.route[0] == lid), key=lambda u: -u.s)
             for lead, u in zip(on_lane, on_lane[1:]):
                 gap = lead.s - u.s - (lead.L + u.L) / 2 - 1.0
                 u.v = min(u.v, float(np.sqrt(lead.v ** 2 + 2 * self.cfg["DT_B_MAX"] * max(gap, 0.0))))
-            self.inflow[lid] = density * rng.uniform(0.08, 0.18)   # vehicles / s
+            self.inflow[lid] = density * rng.uniform(0.08, 0.18) * ln.inflow_w   # vehicles / s
         self.ped_inflow = ped_rate
         for path in self.m.ped_paths:
             if rng.rand() < min(1.0, ped_rate * 6):

@@ -95,6 +95,7 @@ class Lane:
         self.prev = None            # connectors: the incoming lane they leave from
         self.closed_end = False     # lane drop: the lane ends, vehicles must leave it
         self.lane_index = 0         # 0 = innermost
+        self.inflow_w = 1.0         # v3: weight of this lane in its approach's traffic (Issue 4)
 
     def pos(self, s):
         s = np.clip(s, 0.0, self.length)
@@ -167,7 +168,8 @@ def _arc(c, r, a0, a1, n=12):
     return np.stack([c[0] + r * np.cos(a), c[1] + r * np.sin(a)], 1)
 
 
-def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_cw=(), heads_corner=False):
+def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_cw=(), heads_corner=False,
+              v3=False, left_share=0.25):
     """Legs start ``inner`` = half + rc from the centre, where ``rc`` is the
     curb radius of the rounded corners; the crosswalk sits just outside the
     corner fillet and the stop line 1 m before it. Legs in ``force_cw`` always
@@ -205,6 +207,8 @@ def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_
             # no lane changes on the approach (lanes are chosen by movement)
             inc[k, j].solid_right = [(0.0, inc[k, j].length)]
             inc[k, j + 1].solid_left = [(0.0, inc[k, j + 1].length)]
+        if v3 and n_lanes == 2:   # v3: the left-only lane carries left_share of the approach
+            inc[k, 0].inflow_w, inc[k, 1].inflow_w = 2 * left_share, 2 * (1 - left_share)
 
     movements = {}  # (k, j) -> [(turn, leg_out, j_out)]
     for k in range(4):
@@ -264,8 +268,11 @@ def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_
                                        pts=np.stack([ln.pos(ln.length - 9.0), ln.pos(ln.length - 4.0)])))
         m.markings.append(dict(style="double_yellow", pts=(R @ np.array([[0.0, -L], [0.0, -y_stop]]).T).T))
         for j in range(1, n_lanes):
-            m.markings.append(dict(style="solid_white", pts=(R @ np.array([[j * LANE_W, -y_stop - 30], [j * LANE_W, -y_stop]]).T).T))
-            m.markings.append(dict(style="dashed_white", pts=(R @ np.array([[j * LANE_W, -L], [j * LANE_W, -y_stop - 30]]).T).T))
+            if v3:   # v3: solid along the whole approach, like the ban on lane changes
+                m.markings.append(dict(style="solid_white", pts=(R @ np.array([[j * LANE_W, -L], [j * LANE_W, -y_stop]]).T).T))
+            else:
+                m.markings.append(dict(style="solid_white", pts=(R @ np.array([[j * LANE_W, -y_stop - 30], [j * LANE_W, -y_stop]]).T).T))
+                m.markings.append(dict(style="dashed_white", pts=(R @ np.array([[j * LANE_W, -L], [j * LANE_W, -y_stop - 30]]).T).T))
             m.markings.append(dict(style="dashed_white", pts=(R @ np.array([[-j * LANE_W, -y_out], [-j * LANE_W, -L]]).T).T))
         for side in (-1, 1):
             m.markings.append(dict(style="edge", pts=(R @ np.array([[side * half, -L], [side * half, -inner]]).T).T))
@@ -362,7 +369,8 @@ def _buildings_around(m, rng, inner, L, corner):
 
 
 def build_signal4(rng, cfg, protected=None, force_cw=()):
-    m = _four_way(rng, "signal4", 2, 50 / 3.6, True, force_cw=force_cw, heads_corner=cfg.get("DT_HEADS_CORNER", False))
+    m = _four_way(rng, "signal4", 2, 50 / 3.6, True, force_cw=force_cw, heads_corner=cfg.get("DT_HEADS_CORNER", False),
+                  v3=bool(cfg.get("DT_V3")), left_share=cfg.get("DT_LEFT_SHARE", 0.25))
     m.protected_left = rng.rand() < cfg["SIG_ARROW_P"]
     if protected is not None:
         m.protected_left = bool(protected)
