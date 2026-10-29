@@ -120,6 +120,7 @@ def main():
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--forks", type=int, default=4, help="pending clips in forks_v2s.gif")
+    ap.add_argument("--suffix", default="v2s", help="file name suffix, e.g. v3")
     args = ap.parse_args()
     ROOT, out = Path(args.root), Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -157,7 +158,7 @@ def main():
             rest = " / ".join(META["diversity"][k][div[n, q]] for q, k in enumerate("ABCDE") if k != key)
             d.text((x + 4, y + 2), f"{NAMES[key]}: {lab}", fill=(255, 220, 60), font=FONT)
             d.text((x + 4, y + 18), rest, fill=(200, 200, 200), font=FONT)
-        write_gif(grid(picks[key], 3, 32, 2, draw), out / f"diversity_{key}_{NAMES[key]}_v2s.gif")
+        write_gif(grid(picks[key], 3, 32, 2, draw), out / f"diversity_{key}_{NAMES[key]}_{args.suffix}.gif")
 
     def draw_p(g, d, x, y, CAP, tile, f):
         kind, (n, slot, k, fr, pr, cue) = tile
@@ -166,7 +167,7 @@ def main():
         d.text((x + 4, y + 2), f"pending: {kind} (agent {slot}), chosen at frame {int(fr)}", fill=(255, 220, 60), font=FONT)
         d.text((x + 4, y + 18), f"cue {cue:.2f}, p({OUTCOME[kind][1]}) = {pr:.2f}" + ("   [label-only frame]" if f > 31 else ""),
                fill=(255, 120, 120) if f > 31 else (200, 200, 200), font=FONT)
-    write_gif(grid(list(pend.items()), 3, T1 + 1, 2, draw_p), out / "pending_v2s.gif")
+    write_gif(grid(list(pend.items()), 3, T1 + 1, 2, draw_p), out / f"pending_{args.suffix}.gif")
 
     # forks: per pending clip, the ego view and four futures forked at frame 31
     W, CAP = S, 34
@@ -189,7 +190,7 @@ def main():
                 lab = f"future {k}" + (" (label)" if k == 0 else "") + (f": {OUTCOME[kind][o]}" if o >= 0 else "")
                 d.text((xx + 4, y + 18), lab, fill=(255, 120, 120) if f > 31 else (200, 200, 200), font=FONT)
         frames.append(g)
-    write_gif(frames + [frames[-1]] * 5, out / "forks_v2s.gif", fps=4)
+    write_gif(frames + [frames[-1]] * 5, out / f"forks_{args.suffix}.gif", fps=4)
 
 
 if __name__ == "__main__":

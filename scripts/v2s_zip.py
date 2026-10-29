@@ -15,7 +15,7 @@ def pack(src, dst):
     src, t0, n = Path(src), time.time(), 0
     with zipfile.ZipFile(dst, "w", zipfile.ZIP_DEFLATED, allowZip64=True, compresslevel=6) as z:
         for root, dirs, files in os.walk(src):
-            dirs[:] = sorted(d for d in dirs if d not in (".git", "__pycache__"))
+            dirs[:] = sorted(d for d in dirs if not d.startswith(".") and d != "__pycache__")   # .git, .superpowers
             for f in sorted(files):
                 p = Path(root) / f
                 store = p.parent.name == "render" and p.suffix == ".npz"
