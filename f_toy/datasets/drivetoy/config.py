@@ -155,5 +155,20 @@ DRIVETOY_DEFAULT_CFG = dict(
     DT_WRITE_VIDEOS=True,    # write videos.npy (the train split keeps render/ only)
     DT_PENDING_MIN=0.2,      # E: pending gets more weight while its share is below this
 
+    # ---- v3 (version-3-revision.md; plan docs/superpowers/plans/2026-10-29-drivetoy-v3.md) ----
+    DT_V3=False,             # v3: every change below is used only when this is set (V3_OVERRIDES)
+    DT_V0_FRAC_HEAVY=(0.65, 0.85),   # v3: desired speed of trucks and buses, fraction of the limit
+    DT_MIN_V0_FRAC=0.6,      # v3: no vehicle targets less than this fraction without a reason in the scene
+    DT_FOLLOW_GAP_S=2.0,     # v3: "follow" and lead causes bind within this bumper time gap at the ego's speed
+    DT_OVERTAKE_V0_FRAC=(0.60, 0.75),   # v3: an overtaken lead drives at this fraction of the limit
+    DT_OVERTAKE_EGO_FRAC=(0.90, 0.97),  # v3: ... and the overtaking ego at this one
+    DT_ONCOMING_MIN=2.0,     # v3: oncoming headway = this minimum (s) ...
+    DT_ONCOMING_MEAN=(4.0, 8.0),        # v3: ... plus an exponential tail with a mean drawn here per clip (s)
+    DT_LEFT_SHARE=0.25,      # v3: share of a signal4 approach's traffic in its left-only lane
+
     SEED=0,
 )
+
+# v3 builds: the switch plus the prompter starts (D6): a full stop of 0.8 s at a stop sign and
+# 0.2 to 0.6 s before moving off once the way is clear
+V3_OVERRIDES = dict(DT_V3=True, R4_STOP_TIME=0.8, DT_START_DELAY=(0.2, 0.6))
