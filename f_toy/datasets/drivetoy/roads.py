@@ -479,8 +479,17 @@ def build_residential(rng, cfg, **_):
         m.markings.append(dict(style="edge", pts=np.array([[side * LANE_W, L0], [side * LANE_W, L1]])))
         m.markings.append(dict(style="edge", pts=np.array([[side * half, L0], [side * half, L1]])))
     m.surfaces.append(dict(kind="road", poly=np.array([[-half, L0], [half, L0], [half, L1], [-half, L1]])))
-    m.surfaces.append(dict(kind="school", poly=np.array([[0.0, zone[0]], [LANE_W, zone[0]], [LANE_W, zone[0] + 15], [0.0, zone[0] + 15]])))
-    m.surfaces.append(dict(kind="school", poly=np.array([[-LANE_W, zone[1] - 15], [0.0, zone[1] - 15], [0.0, zone[1]], [-LANE_W, zone[1]]])))
+    if cfg.get("DT_V3"):
+        # v3 (Issue 8): red pavement on both lanes along the whole zone, and a filled blue triangle
+        # (2.0 m by 4 m) on each lane 2 m into its zone, apex toward the approaching driver
+        m.surfaces.append(dict(kind="school", poly=np.array([[-LANE_W, zone[0]], [LANE_W, zone[0]], [LANE_W, zone[1]], [-LANE_W, zone[1]]])))
+        for sgn, y_in in ((1.0, zone[0]), (-1.0, zone[1])):
+            xc = sgn * LANE_W / 2
+            m.markings.append(dict(style="school_triangle", pts=np.array(
+                [[xc, y_in + sgn * 2.0], [xc - 1.0, y_in + sgn * 6.0], [xc + 1.0, y_in + sgn * 6.0]])))
+    else:
+        m.surfaces.append(dict(kind="school", poly=np.array([[0.0, zone[0]], [LANE_W, zone[0]], [LANE_W, zone[0] + 15], [0.0, zone[0] + 15]])))
+        m.surfaces.append(dict(kind="school", poly=np.array([[-LANE_W, zone[1] - 15], [0.0, zone[1] - 15], [0.0, zone[1]], [-LANE_W, zone[1]]])))
     for x0, x1 in ((half, half + SW_W), (-half - SW_W, -half)):
         m.surfaces.append(dict(kind="sidewalk", poly=np.array([[x0, L0], [x1, L0], [x1, L1], [x0, L1]])))
     m.signs.append(dict(kind="school_zone", pos=np.array([half + 1.0, zone[0]]), heading=-np.pi / 2, value=30))

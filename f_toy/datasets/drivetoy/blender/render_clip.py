@@ -301,6 +301,8 @@ def build_static(sc, rng):
             G(0).add(g_strip(pts, 0.15, z), white)
         elif st == "stop_line":
             G(0).add(g_strip(pts, 0.45, z), white)
+        elif st == "school_triangle":   # v3 (Issue 8): filled blue, on the red zone pavement
+            G(0).add(g_poly(pts, z), mat("school_tri", (0.04, 0.16, 0.7), rough=0.5))
         elif st == "double_yellow":
             d = pts[-1] - pts[0]
             n = np.array([-d[1], d[0]]) / (np.linalg.norm(d) + 1e-9)
