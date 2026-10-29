@@ -52,6 +52,25 @@ def test_v3_leads():
     assert len(built) >= len(jobs) // 2
 
 
+def _stream_job(seed):
+    row = [r for r in COMBOS if r[2] == "residential" and r[6] == "nudge"][seed % 2]
+    A, B, tmpl, D, C, E, V = row
+    res = simulate(1500 + seed, V3, target=dict(A=A, B=B, C=C, D=D, E=E, V=V, template=tmpl))
+    if not res["ok"]:
+        return None
+    rec = res["branches"][0]
+    typ = rec["agents"][:, :, 0].max(0)
+    return [round(float(rec["drivers"][s, 1]), 3) for s in range(1, len(typ)) if 1 <= typ[s] <= 4 and rec["drivers"][s, 1] < 0.6]
+
+
+def test_no_crawling_stream_cars():
+    """Scripted oncoming streams (residential nudge) keep normal desired speeds; the zone slows them."""
+    with Pool(16) as p:
+        out = [o for o in p.map(_stream_job, range(16)) if o is not None]
+    print(f"built {len(out)}; vehicles below 60%: {[x for o in out for x in o]}")
+    assert len(out) >= 8 and not [x for o in out for x in o]
+
+
 if __name__ == "__main__":
     for name, fn in list(globals().items()):
         if name.startswith("test_"):

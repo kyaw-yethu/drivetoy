@@ -31,7 +31,9 @@ from .choices import CHOICE_KINDS, DEC_COLS, DRIVER_COLS, MAX_DECISIONS
 from .config import DRIVETOY_DEFAULT_CFG
 from .diversity import ASPECTS
 from .export import scene_dict
+from .map_io import save_map
 from .scenarios import COMBOS, VARIANTS, plan_targets, simulate
+from .sim import MAY_GO_REASONS
 
 BLENDER = os.environ.get("BLENDER", "/root/opt/blender/blender")
 RENDER_SCRIPT = Path(__file__).resolve().parent / "blender" / "render_clip.py"
@@ -77,6 +79,11 @@ def _sim_one(task):
         decisions = np.full((MAX_DECISIONS, len(DEC_COLS)), -1, np.float32)
         decisions[:len(dec)] = dec
         _save_futures(out / "futures" / f"{n:06d}.npz", res["forks"][b])
+        v3 = {}
+        if cfg.get("DT_V3"):   # v3 (Issue 7): may_go per frame, whether the route was drawn per future, the map
+            v3 = dict(may_go=rec["may_go"], may_go_reason=rec["may_go_reason"], ego_turn=rec["ego_turn"],
+                      route_drawn=np.bool_(res["route_draws"][b] is not None))
+            save_map(out / "maps" / f"{n:06d}.json.gz", res["map"])
         np.savez(out / "labels" / f"{n:06d}.npz",
                  decisions=decisions, num_decisions=np.int16(len(dec)), drivers=rec["drivers"],
                  variant=np.int8(VARIANTS.index(tgt["V"]) if tgt.get("V") else -1),
@@ -92,7 +99,7 @@ def _sim_one(task):
                  camera=np.array([sc["camera"]["height"], sc["camera"]["pitch"], sc["camera"]["fov"]], np.float32),
                  head_info=np.array([[HEAD_KINDS.index(h["kind"]), sc["groups"].index(h["group"]) if h["group"] in sc["groups"] else -1,
                                       h["leg"]] for h in sc["heads"]] or np.zeros((0, 3)), np.int8).reshape(-1, 3),
-                 signs=np.array([s["kind"] == "stop" for s in sc["signs"]], bool))
+                 signs=np.array([s["kind"] == "stop" for s in sc["signs"]], bool), **v3)
     return i, [res["labels"][0][k] for k in "ABCDE"]
 
 
@@ -107,7 +114,8 @@ def _save_futures(path, futs):
         d = f["decisions"][np.argsort(-f["decisions"][:, 6], kind="stable")][:MAX_FUTURE_DECISIONS]
         dec[k, :len(d)] = d
     np.savez(path, decisions=dec, **{key: np.stack([f[key] for f in futs])
-                                     for key in ("ego", "agents", "lamps", "signals", "rule_state", "yield_to")})
+                                     for key in ("ego", "agents", "lamps", "signals", "rule_state", "yield_to")
+                                     + tuple(k for k in ("may_go", "may_go_reason", "ego_turn") if k in futs[0])})
 
 
 def _assemble_futures(out, N):
@@ -250,7 +258,7 @@ def simulate_split(cfg, out, n_clips, workers=None):
 
 def build_to_disk(cfg, out_dir, workers=None, render=True):
     out = Path(out_dir)
-    for d in ("scenes", "labels", "render", "futures"):
+    for d in ("scenes", "labels", "render", "futures") + (("maps",) if cfg.get("DT_V3") else ()):
         (out / d).mkdir(parents=True, exist_ok=True)
     K, T, IMG = cfg["DT_BRANCHES"], cfg["FRAMES"], cfg["IMG"]
     n_clips = -(-cfg["NUM_SAMPLES"] // K)
@@ -315,4 +323,6 @@ def assemble(out, cfg, only=None):
                 diversity={k: v for k, v in ASPECTS.items()}, forks=cfg.get("DT_FORKS", 1), choices=CHOICE_KINDS,
                 decision_cols=DEC_COLS, driver_cols=DRIVER_COLS + ["cued"], variants=VARIANTS,
                 cfg={k: cfg[k] for k in DRIVETOY_DEFAULT_CFG})
+    if cfg.get("DT_V3"):
+        meta.update(version=3, may_go_reasons=MAY_GO_REASONS)
     (out / "meta.json").write_text(json.dumps(meta, indent=2, default=list))

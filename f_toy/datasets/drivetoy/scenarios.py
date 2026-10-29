@@ -240,6 +240,8 @@ def _stream(sim, rng, ln, s_conf, t_end, gap, v, route=None, v_gap=None):
         if route is not None:
             u.turn_w = {x: float(x == route) + 1e-9 for x in "LSR"}
         u.v0frac = min(0.97, vk / ln.limit + 0.05)
+        if sim.cfg.get("DT_V3"):   # v3 (Issue 1): a normal desired speed; a zone it drives through slows it
+            u.v0frac = max(u.v0frac, sim.cfg["DT_V0_FRAC"][0])
         u.T, u.s0 = _u(rng, 1.0, 1.3), _u(rng, 1.5, 2.0)
         if sim.cfg.get("DT_V3"):
             u.T = max(u.T, sim.cfg["DT_ONCOMING_MIN"])
@@ -845,6 +847,7 @@ def _future(pk, T0):
                 decisions=dec[dec[:, 0] > T0])
     if "may_go" in pk:   # v3 (Issue 7)
         fu["may_go"], fu["may_go_reason"] = pk["may_go"][T0 + 1:], pk["may_go_reason"][T0 + 1:]
+        fu["ego_turn"] = pk["ego_turn"]
     return fu
 
 
@@ -1064,6 +1067,7 @@ def _pack(sim):
     if fr and "may_go" in fr[0]:   # v3 (Issue 7)
         mg = np.stack([f["may_go"] for f in fr])
         pk["may_go"], pk["may_go_reason"] = mg[:, 0], mg[:, 1]
+        pk["ego_turn"] = np.int8({"L": 1, "S": 2, "R": 3}.get(getattr(sim.ego, "turn", None), 0))   # its final move
     return pk
 
 
