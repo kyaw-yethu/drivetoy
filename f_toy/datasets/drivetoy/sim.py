@@ -17,7 +17,7 @@ import copy
 
 import numpy as np
 
-from .choices import CHOICE_KINDS, biased, choice_p, driver_values, style_c50
+from .choices import CHOICE_KINDS, biased, cautious_gap, choice_p, driver_values, style_c50
 from .roads import LANE_W, build_map
 
 # kind -> (type code, length, width, height, weight)
@@ -29,6 +29,8 @@ TYPE_NAMES = ["none", "car", "suv", "truck", "bus", "ped_adult", "ped_child"]
 RULE_STATES = ["GO", "FOLLOW", "STOP_SIGNAL", "STOP_SIGN", "YIELD_ONCOMING", "YIELD_PED",
                "YIELD_CONFLICT", "MERGE", "SLOW", "PED_WALK", "PED_WAIT"]
 RS = {n: i for i, n in enumerate(RULE_STATES)}
+# v3 (Issue 7): why an ego stopped at its line could not enter now (index 0: it could, or no line)
+MAY_GO_REASONS = ["", "light", "oncoming", "pedestrian", "conflict", "stop_order"]
 
 EVENTS = ["SIGNAL", "TURN_ON", "LC_START", "STOP", "GO", "YIELD", "ENTER", "PED_DECIDE", "PED_CROSS",
           "LET_IN", "INDICATOR_OFF", "VIOLATE", "WAVE", "CANCEL"]
@@ -1808,6 +1810,59 @@ class Sim:
                 lc_moving[u.slot] = 1 if u.lc["side"] == "left" else 2
         self.frames.append(dict(agents=ag, lamps=lamps, extra=extra, signals=sig, lc=lc_moving,
                                 ego=np.array([ep[0], ep[1], eh, ego.v], np.float32)))
+        if self.cfg.get("DT_V3"):
+            self.frames[-1]["may_go"] = np.array(self.may_go_probe(), np.int8)
+
+    def may_go_probe(self):
+        """v3 (Issue 7, D3): whether an ego stopped at its stop line on its own route could enter
+        now: (1, 0), (0, index into MAY_GO_REASONS), or (-1, 0) when it has no stop line ahead or has
+        entered. An open route needs every move its lane allows. Reads state only; draws nothing."""
+        ego = self.ego
+        if ego is None or ego.entered:
+            return -1, 0
+        i, _ = ego.where()
+        ln = ego.lanes[i]
+        if ln.kind != "in" or ln.stop is None or i + 1 >= len(ego.lanes):
+            return -1, 0
+        conns = [self.m.lanes[x] for x in ln.next] if ego.route_pending else [ego.lanes[i + 1]]
+        signal = ln.stop["control"] == "signal"
+        arrow = False
+        if signal:
+            ball, arrow, _, _ = self.signals.state(ln.stop["group"], self.t)
+            if any(not (ball == BALL_G or (arrow and c.turn == "L")) for c in conns):
+                return 0, MAY_GO_REASONS.index("light")
+        block, entering = self._ped_block()
+        if any(cw in block or cw in entering for c in conns for _, _, cw in c.crosswalks):
+            return 0, MAY_GO_REASONS.index("pedestrian")
+        if signal:   # the gap the most cautious driver takes, judged from a standstill at the line
+            need = cautious_gap(self.cfg) + float(np.mean(self.cfg["DT_START_DELAY"]))
+            for c in conns:
+                if c.turn == "L" and not arrow:
+                    gap, who, inside = self._oncoming_gap(ln, c)
+                    if inside is not None or (who is not None and gap < need):
+                        return 0, MAY_GO_REASONS.index("oncoming")
+        for u in self.vehicles:
+            if u is ego or u.parked:
+                continue
+            ui, usl = u.where()
+            ul = u.lanes[ui]
+            uc, us = (ul, usl) if ul.kind == "conn" else (None, None)
+            if ul.kind == "in" and u.entered and not u.route_open and ui + 1 < len(u.lanes):
+                uc, us = u.lanes[ui + 1], usl - ul.length   # front over the line, centre not yet
+            if uc is None:
+                continue
+            for c in conns:
+                z = self.m.conflicts.get((uc.id, c.id))
+                if z is not None and us - u.L / 2 <= z[1]:
+                    return 0, MAY_GO_REASONS.index("conflict")
+        if not signal:   # D3: no car waiting at another approach is moving
+            for u in self.vehicles:
+                if u is ego or u.entered or u.arrival is None:
+                    continue
+                ul = u.lanes[u.where()[0]]
+                if ul.kind == "in" and ul.leg != ln.leg and u.v >= self.cfg["R4_STOP_V"]:
+                    return 0, MAY_GO_REASONS.index("stop_order")
+        return 1, 0
 
     def routes(self):
         """Final route of every vehicle slot (lane ids, -1 padded) and its lane-change history is in frames."""

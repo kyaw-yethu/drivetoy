@@ -838,11 +838,14 @@ def _fork_seed(seed, attempt, b, k):
 def _future(pk, T0):
     """What a future set keeps of a packed record: frames T0+1 on, and the choices made in them."""
     ag, ex, dec = pk["agents"][T0 + 1:], pk["extra"][T0 + 1:], pk["decisions"]
-    return dict(ego=pk["ego"][T0 + 1:], agents=ag[..., [1, 2, 3, 4, 9]].astype(np.float16),
+    fu = dict(ego=pk["ego"][T0 + 1:], agents=ag[..., [1, 2, 3, 4, 9]].astype(np.float16),
                 lamps=np.packbits(pk["lamps"][T0 + 1:].astype(bool), axis=-1),
                 signals=pk["signals"][T0 + 1:, :, :2].astype(np.int8),
                 rule_state=ex[:, 0, 3].astype(np.int8), yield_to=ex[:, 0, 4].astype(np.int8),
                 decisions=dec[dec[:, 0] > T0])
+    if "may_go" in pk:   # v3 (Issue 7)
+        fu["may_go"], fu["may_go_reason"] = pk["may_go"][T0 + 1:], pk["may_go_reason"][T0 + 1:]
+    return fu
 
 
 def simulate(seed, cfg, template=None, target=None):
@@ -1051,13 +1054,17 @@ def count_view_events(rec, m, cfg):
 def _pack(sim):
     fr = sim.frames
     events = [e for e in sim.events if e[0] >= 0]
-    return dict(
+    pk = dict(
         agents=np.stack([f["agents"] for f in fr]), lamps=np.stack([f["lamps"] for f in fr]),
         extra=np.stack([f["extra"] for f in fr]), signals=np.stack([f["signals"] for f in fr]),
         lc=np.stack([f["lc"] for f in fr]), ego=np.stack([f["ego"] for f in fr]),
         events=np.array(events, np.float32).reshape(-1, 5), ran_out=sim.ego_ran_out,
         decisions=np.array(sim.decisions, np.float32).reshape(-1, len(DEC_COLS)), drivers=_drivers(sim),
         routes=_routes(sim))
+    if fr and "may_go" in fr[0]:   # v3 (Issue 7)
+        mg = np.stack([f["may_go"] for f in fr])
+        pk["may_go"], pk["may_go_reason"] = mg[:, 0], mg[:, 1]
+    return pk
 
 
 def _drivers(sim):

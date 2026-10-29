@@ -20,6 +20,13 @@ def style_c50(cfg, kind, style):
     return c50 - shift * (2.0 * style - 1.0), w
 
 
+def cautious_gap(cfg, kind="left_gap", p=0.9):
+    """v3: the cue at which even the most cautious driver (style 0) takes the assertive outcome
+    with probability p (5.27 s of oncoming gap for left_gap with the defaults)."""
+    c50, w = style_c50(cfg, kind, 0.0)
+    return float(c50 + w * np.log(p / (1.0 - p)))
+
+
 def biased(rng, rng_range, style, corr, up=True):
     """A value in ``rng_range`` that leans to its upper end for assertive drivers (``up``) or to
     its lower end, with weight ``corr`` on the style and the rest drawn freely."""
