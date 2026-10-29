@@ -353,6 +353,9 @@ class Sim:
         self.ego_ran_out = False
         self.inflow = {}
         self.ped_inflow = 0.0
+        self.gap_lanes = {}        # v3: lane id -> mean of its exponential headway tail (Issue 3)
+        self.stream_mu = {}        # v3: the same for lanes fed by a recipe's stream only
+        self.next_arrival = {}     # v3: next spawn time on a gap lane
         self.violation = cfg.get("DT_VIOLATION")
         self.viol_from = cfg["DT_BRANCH_FRAME"] + 1
         self.decisions = []        # [frame, slot, kind, cue, p, outcome, ego_rel] (choices.DEC_COLS)
@@ -485,7 +488,12 @@ class Sim:
                     if ln.closed_end:         # ... or before the end of a closing lane (no RNG draw:
                         d = max(ln.length - veh.front - 3.0, 0.0)   # other scenes stay reproducible)
                         veh.v = min(veh.v, np.sqrt(2 * 2.0 * d))
-                s += rng.uniform(12, 70) / max(density, 0.15)
+                    if lid in self.gap_lanes:
+                        veh.T = max(veh.T, self.cfg["DT_ONCOMING_MIN"])
+                if lid in self.gap_lanes:     # v3: spaced by the oncoming headway law
+                    s += ln.limit * 0.85 * self.headway(lid)
+                else:
+                    s += rng.uniform(12, 70) / max(density, 0.15)
             # front to back: a follower must be able to stop behind its leader even if the leader
             # brakes as hard as it can (no RNG draw: scenes where this does not bind stay unchanged)
             on_lane = sorted((u for u in self.vehicles if u.route[0] == lid), key=lambda u: -u.s)
@@ -497,6 +505,16 @@ class Sim:
         for path in self.m.ped_paths:
             if rng.rand() < min(1.0, ped_rate * 6):
                 self.add_ped(path, s=rng.uniform(0, _pathlen(path["approach"])))
+
+    def headway(self, lane_id):
+        """v3 (Issue 3): an oncoming headway, DT_ONCOMING_MIN plus an exponential tail whose mean is
+        the lane's (``gap_lanes``) or one drawn once for the lane from DT_ONCOMING_MEAN."""
+        mu = self.gap_lanes.get(lane_id)
+        if mu is None:
+            mu = self.stream_mu.get(lane_id)
+            if mu is None:
+                mu = self.stream_mu[lane_id] = _u(self.rng, self.cfg["DT_ONCOMING_MEAN"])
+        return self.cfg["DT_ONCOMING_MIN"] + float(self.rng.exponential(mu))
 
     def _blocked(self, lid, s, margin):
         for u in self.vehicles:
@@ -1675,18 +1693,26 @@ class Sim:
     def _spawn(self):
         rng = self.rng
         for lid, rate in self.inflow.items():
-            if rng.rand() < rate / self.fps:
-                ln = self.m.lanes[lid]
-                ok = True
-                for u, us in self._lane_index().get(lid, ()):
-                    if us - u.L / 2 < 25.0:
-                        ok = False
-                if ok:
-                    veh = self.add_vehicle(lid, 3.0)
-                    if veh is not None:
-                        lead, gap = self._leader(veh, self._lane_index())
-                        if lead is not None:
-                            veh.v = min(veh.v, lead.v + 0.1 * gap)
+            renewal = lid in self.gap_lanes   # v3: arrivals with the oncoming headway law
+            if renewal:
+                if self.t < self.next_arrival.setdefault(lid, self.t + self.headway(lid)):
+                    continue
+            elif not rng.rand() < rate / self.fps:
+                continue
+            ln = self.m.lanes[lid]
+            ok = True
+            for u, us in self._lane_index().get(lid, ()):
+                if us - u.L / 2 < 25.0:
+                    ok = False
+            if ok:
+                veh = self.add_vehicle(lid, 3.0)
+                if veh is not None:
+                    lead, gap = self._leader(veh, self._lane_index())
+                    if lead is not None:
+                        veh.v = min(veh.v, lead.v + 0.1 * gap)
+                    if renewal:
+                        veh.T = max(veh.T, self.cfg["DT_ONCOMING_MIN"])
+                        self.next_arrival[lid] = self.t + self.headway(lid)
         if self.ped_inflow > 0 and self.m.ped_paths and rng.rand() < self.ped_inflow / self.fps:
             path = self.m.ped_paths[int(rng.randint(len(self.m.ped_paths)))]
             self.add_ped(path, 0.0)

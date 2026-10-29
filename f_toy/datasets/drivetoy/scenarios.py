@@ -225,7 +225,7 @@ def _stream(sim, rng, ln, s_conf, t_end, gap, v, route=None, v_gap=None):
     times, t = [], t_end
     while t > 1.2:
         times.append((t, v))
-        t -= _u(rng, 1.6, 2.4)
+        t -= sim.headway(ln.id) if sim.cfg.get("DT_V3") else _u(rng, 1.6, 2.4)   # v3: Issue 3 gaps
     times.append((t_end + gap, v_gap or v))
     cws = {cw for _, _, cw in ln.crosswalks}
     sim.peds = [p for p in sim.peds if p.cw not in cws]   # nobody on its crosswalks: the stream keeps its timing
@@ -241,6 +241,8 @@ def _stream(sim, rng, ln, s_conf, t_end, gap, v, route=None, v_gap=None):
             u.turn_w = {x: float(x == route) + 1e-9 for x in "LSR"}
         u.v0frac = min(0.97, vk / ln.limit + 0.05)
         u.T, u.s0 = _u(rng, 1.0, 1.3), _u(rng, 1.5, 2.0)
+        if sim.cfg.get("DT_V3"):
+            u.T = max(u.T, sim.cfg["DT_ONCOMING_MIN"])
 
 
 def _conflict_lane(m, ego_ln, ego_turn, legs, route="S"):
@@ -277,6 +279,8 @@ def _recipe_signal4(sim, rng, tg):
     A, B, C, D, V = tg["A"], tg["B"], tg["C"], tg["D"], tg.get("V")
     k = sim.ego_leg
     lanes = _in_lanes(m, k)
+    if cfg.get("DT_V3"):   # v3 (Issue 3): the opposite straight-and-right lane brings random gaps
+        sim.gap_lanes[_in_lanes(m, (k + 2) % 4)[1].id] = _u(rng, *cfg["DT_ONCOMING_MEAN"])
     inner = D == "left turn" or A in ("arrow", "permissive left") or V == "left_gap" or \
         (A == "steady red" and V != "rtor" and rng.rand() < 0.3)
     ln = lanes[0] if inner else lanes[1]
@@ -396,9 +400,10 @@ def _recipe_signal4(sim, rng, tg):
             for o in opp:
                 _clear(s, o.id, 0.0, o.stop["s"])
             for _ in range(n_on):
-                _add_ahead(s, r, opp[1], _s_for_line(opp[1], d) - EGO_HALF - 1.0, 1.0, v=50 / 3.6 * _u(r, 0.7, 0.95), route="S",
+                v_on = 50 / 3.6 * _u(r, 0.7, 0.95)
+                _add_ahead(s, r, opp[1], _s_for_line(opp[1], d) - EGO_HALF - 1.0, 1.0, v=v_on, route="S",
                            cap_line=False)   # it has the green
-                d += _u(r, 10.0, 18.0)
+                d += v_on * s.headway(opp[1].id) if s.cfg.get("DT_V3") else _u(r, 10.0, 18.0)
             out_cw = (k + 3) % 4      # nobody on the crosswalk the turn passes
             s.peds = [p for p in s.peds if p.cw != out_cw or p.state == 4]
         plan["post"].append(oncoming)
