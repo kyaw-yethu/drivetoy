@@ -27,6 +27,9 @@ import time
 import bpy
 import numpy as np
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from geom import crown_blocks   # noqa: E402  (v3: no tree crowns in the sightlines)
+
 CAR_COLORS = [(0.55, 0.05, 0.04), (0.02, 0.12, 0.40), (0.85, 0.85, 0.85), (0.05, 0.05, 0.05), (0.45, 0.45, 0.47),
               (0.10, 0.28, 0.12), (0.75, 0.55, 0.08), (0.20, 0.35, 0.55), (0.60, 0.60, 0.62), (0.30, 0.08, 0.20),
               (0.80, 0.30, 0.05), (0.15, 0.15, 0.20)]
@@ -391,6 +394,8 @@ def _arrow(geo, style, pts, material, z):
 def _trees(geo, sc, rng):
     trunk = mat("trunk", (0.18, 0.11, 0.06))
     leaves = [mat(f"leaf{i}", c, rough=0.9) for i, c in enumerate([(0.08, 0.22, 0.05), (0.12, 0.28, 0.07), (0.16, 0.24, 0.06)])]
+    sight = np.asarray(sc.get("sightlines", []), float).reshape(-1, 6)
+    skipped = 0
     for s in sc["surfaces"]:
         p = np.asarray(s["poly"], float)
         if s["kind"] != "sidewalk" or len(p) != 4:
@@ -405,8 +410,14 @@ def _trees(geo, sc, rng):
                 continue
             q = a + u * t + w * 0.75
             h = rng.uniform(3.5, 6.0)
+            r = rng.uniform(1.2, 2.0)
+            leaf = leaves[rng.randint(3)]
+            if crown_blocks((q[0], q[1], h * 0.72), r, sight):   # v3: drawn but left out
+                skipped += 1
+                continue
             geo.add(g_cyl(q[0], q[1], 0.15, h * 0.6, 0.15), trunk)
-            geo.add(g_blob(q[0], q[1], h * 0.72, rng.uniform(1.2, 2.0)), leaves[rng.randint(3)])
+            geo.add(g_blob(q[0], q[1], h * 0.72, r), leaf)
+    print(f"trees skipped: {skipped}", flush=True)
 
 
 def _sign(geo, s, index):

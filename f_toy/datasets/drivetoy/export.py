@@ -13,6 +13,32 @@ def _l(a):
     return np.asarray(a, dtype=float).round(4).tolist()
 
 
+def sightlines(m, signs, heads, z_eye=1.4, near=10.0, far=60.0, step=5.0, reach=12.0):
+    """v3 (Issue 5): segments [x0, y0, z0, x1, y1, z1] from a driver's eye on each approach lane,
+    every ``step`` m from ``near`` to ``far`` m before each sign and signal head that faces that
+    lane's traffic within ``reach`` m to the side, to the sign's face (2.3 m) or the head."""
+    objs = [(np.asarray(s["pos"][:2], float), 2.3, float(s["heading"])) for s in signs] + \
+           [(np.asarray(h["pos"][:2], float), float(h["pos"][2]), float(h["heading"])) for h in heads]
+    out = []
+    for ln in m.lanes:
+        if ln.kind not in ("in", "road"):
+            continue
+        for p, z, face in objs:
+            k = int(np.argmin(np.linalg.norm(ln.pts - p, axis=1)))
+            hk = float(ln.head[k])
+            if np.cos(face - (hk + np.pi)) < 0.7:   # it does not face this lane's traffic
+                continue
+            rel = p - ln.pts[k]
+            if abs(float(np.dot(rel, [-np.sin(hk), np.cos(hk)]))) > reach:
+                continue
+            s_obj = float(ln.s[k]) + float(np.dot(rel, [np.cos(hk), np.sin(hk)]))   # past the end: along its heading
+            for d in np.arange(near, far + 1e-6, step):
+                if 0.0 <= s_obj - d <= ln.length:
+                    e = ln.pos(s_obj - d)
+                    out.append([float(e[0]), float(e[1]), z_eye, float(p[0]), float(p[1]), z])
+    return out
+
+
 def scene_dict(result, branch, cfg, seed):
     m = result["map"]
     rec = result["branches"][branch]
@@ -60,7 +86,7 @@ def scene_dict(result, branch, cfg, seed):
     )
     cam = dict(height=float(rng.uniform(*cfg["CAM_HEIGHT"])), pitch=float(rng.uniform(*cfg["CAM_PITCH"])),
                fov=float(cfg["CAM_FOV"]), forward=float(cfg["CAM_FORWARD"]))
-    return dict(
+    sc = dict(
         template=m.template, img=cfg["IMG"], frames=T, cue_scale=float(cfg["DT_CUE_SCALE"]),
         signal_scale=float(cfg.get("DT_SIGNAL_SCALE", cfg["DT_CUE_SCALE"])),
         signal_layout=str(cfg.get("DT_SIGNAL_LAYOUT", "vertical")),
@@ -84,6 +110,9 @@ def scene_dict(result, branch, cfg, seed):
         signals=_l(rec["signals"][:T]), ego=_l(rec["ego"][:T]),
         colors={str(k): int(v) for k, v in result["colors"].items()},
     )
+    if cfg.get("DT_V3"):   # v3 (Issue 5): where no tree crown may stand
+        sc["sightlines"] = sightlines(m, sc["signs"], sc["heads"])
+    return sc
 
 
 def write_scene(path, result, branch, cfg, seed):
