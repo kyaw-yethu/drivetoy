@@ -197,6 +197,8 @@ class Vehicle:
         self.choices = {}          # kind -> (key, outcome) of its latest major choice
         self.go_at = None          # start-up delay: when a stopped vehicle may move off
         self.commit = None         # v3: the "go" choice it committed to (left_gap, rtor, stop_wave)
+        self.route_pending = False # v3: the ego's move is drawn per future at the fork (Issue 6)
+        self.late_route = False    # v3: its move was drawn at the fork; the indicator follows turn_dist only
         self.rtor_stop, self.rtor_ready, self.rtor_on = 0.0, False, False   # right turn on red
         self.behind_since = None   # overtaker: since when it is held up behind a slow leader
         self.ind_pending = False   # turn decided, indicator not on yet (it comes on at turn_dist)
@@ -510,6 +512,17 @@ class Sim:
             if rng.rand() < min(1.0, ped_rate * 6):
                 self.add_ped(path, s=rng.uniform(0, _pathlen(path["approach"])))
 
+    def set_ego_route(self, turn):
+        """v3 (Issue 6): give the ego, still before its line, the move ``turn`` drawn for this future."""
+        veh = self.ego
+        i, _ = veh.where()
+        ln = veh.lanes[i]
+        c = next(self.m.lanes[x] for x in ln.next if self.m.lanes[x].turn == turn)
+        veh.set_route(self.m, veh.route[:veh.route.index(ln.id) + 1] + [c.id] + c.next)
+        veh.turn = c.turn
+        veh.route_pending, veh.late_route = False, True
+        veh.ind_pending = c.turn in ("L", "R")
+
     def headway(self, lane_id):
         """v3 (Issue 3): an oncoming headway, DT_ONCOMING_MIN plus an exponential tail whose mean is
         the lane's (``gap_lanes``) or one drawn once for the lane from DT_ONCOMING_MEAN."""
@@ -547,6 +560,16 @@ class Sim:
             start += ln.length
             if start > 80.0:
                 break
+        if veh.route_pending and veh.lanes[i].kind == "in":
+            # v3 (D4): an ego whose move is still open slows for the tightest move its lane allows
+            ln_i = veh.lanes[i]
+            base = -sl - veh.L / 2 + ln_i.length
+            for c in (self.m.lanes[x] for x in ln_i.next):
+                dist = base + c.s
+                mask = (dist >= -veh.L) & (dist <= 80.0)
+                if mask.any():
+                    v_curve = np.sqrt(a_lat / np.maximum(c.curv[mask], 1e-4))
+                    best = min(best, float(np.min(np.sqrt(v_curve ** 2 + 2 * acc * np.maximum(dist[mask], 0.0)))))
         return best
 
     def _idm(self, veh, v0, gap, vl):
@@ -666,13 +689,17 @@ class Sim:
             if veh.route_open and to_line <= max(veh.turn_dist, 2.5 * veh.v):
                 self._decide_route(veh, ln)
                 i, sl = veh.where()
-            if veh.ind_pending and (to_line <= max(veh.turn_dist, 2.5 * veh.v) or self.frame >= cfg["DT_CUE_FRAME"] - 1):
+            if veh.ind_pending and (to_line <= max(veh.turn_dist, 2.5 * veh.v)
+                                    or (self.frame >= cfg["DT_CUE_FRAME"] - 1 and not veh.late_route)):
                 veh.ind_pending = False   # the turn shows by the last visible frame at the latest
                 veh.indicator, veh.indicator_on_t = (1 if veh.turn == "L" else 2), self.t
                 self._event("TURN_ON", veh.slot, -1, veh.indicator)
             d_line = veh.off[i] + ln.stop["s"] - veh.front
             if not veh.route_open:
-                ok, why, other = self._may_enter(veh, ln, d_line, index, ped_entering)
+                ok, why, other = self._may_enter(veh, ln, d_line, index, ped_entering, ped_block)
+                if veh.route_pending and veh.granted:   # v3: let through before the fork, its move is final
+                    veh.route_pending = False
+                    veh.ind_pending = veh.turn in ("L", "R")
                 if not ok:
                     margin = veh.stop_dist - veh.s0          # it comes to rest stop_dist before the line
                     if why == RS["STOP_SIGN"] and veh.creep and veh.arrival is not None:
@@ -792,7 +819,7 @@ class Sim:
                     best = (u, us)
         return None if best is None else best[0]
 
-    def _may_enter(self, veh, ln, d_line, index, ped_entering):
+    def _may_enter(self, veh, ln, d_line, index, ped_entering, ped_block=None):
         """Whether ``veh`` may pass its stop line now: (ok, rule_state, other)."""
         cfg = self.cfg
         conn = veh.lanes[veh.route.index(ln.id) + 1]
@@ -845,6 +872,16 @@ class Sim:
             for s0, s1, cw in conn.crosswalks:
                 if cw in ped_entering:
                     return False, RS["YIELD_PED"], ped_entering[cw]
+        if veh.route_pending:   # v3 (D4): it enters only if every move its lane allows could go now
+            for c in (self.m.lanes[x] for x in ln.next):
+                for s0, s1, cw in c.crosswalks:
+                    p = (ped_block or {}).get(cw, ped_entering.get(cw))
+                    if p is not None:
+                        return False, RS["YIELD_PED"], p
+                if c.turn == "L" and ln.stop["control"] == "signal" and not self.signals.state(ln.stop["group"], self.t)[1]:
+                    gap, who, inside = self._oncoming_gap(ln, c)
+                    if inside is not None or (who is not None and gap < self.cfg["DT_GAP_FLOOR"]):
+                        return False, RS["YIELD_ONCOMING"], (inside or who).slot
         if self.cfg.get("DT_V3") and veh.commit in ("left_gap", "rtor"):
             occ = self._conflict_occupied(veh, conn)
             if occ >= 0:
@@ -868,16 +905,10 @@ class Sim:
             veh.granted = True
         return True, RS["GO"], -1
 
-    def _oncoming_clear(self, veh, ln, conn, index):
-        """R3: oncoming through or right traffic. Nobody inside the conflict and nobody within
-        DT_GAP_FLOOR s of it; then taking the gap is a choice whose odds rise with the nearest
-        oncoming vehicle's time to the conflict (one choice per gap, keyed by that vehicle)."""
-        if self.cfg.get("DT_V3") and veh.commit == "left_gap":
-            occ = self._conflict_occupied(veh, conn)
-            if occ < 0:
-                return True, -1
-            self._cancel(veh, occ)
-            return False, occ
+    def _oncoming_gap(self, ln, conn):
+        """R3's scan of oncoming through and right traffic: (time of the nearest one to the conflict
+        with ``conn``, that vehicle, None), or (inf, None, u) for a vehicle u already on its connector
+        short of the conflict's end. Draws nothing."""
         ko = (ln.leg + 2) % 4
         best, who = np.inf, None
         for u in self.vehicles:
@@ -893,7 +924,7 @@ class Sim:
             if ul.kind == "conn":
                 z = self.m.conflicts.get((uconn.id, conn.id))
                 if z is not None and usl - u.L / 2 <= z[1] + 0.5:
-                    return False, u.slot
+                    return np.inf, None, u
                 continue
             if u.yellow == "stop" and self.signals.state(ul.stop["group"], self.t)[0] == BALL_Y:
                 continue
@@ -904,6 +935,25 @@ class Sim:
             tta = dist / max(u.v, 1.0)
             if tta < min(best, 12.0):
                 best, who = tta, u
+        return best, who, None
+
+    def _oncoming_clear(self, veh, ln, conn, index):
+        """R3: oncoming through or right traffic. Nobody inside the conflict and nobody within
+        DT_GAP_FLOOR s of it; then taking the gap is a choice whose odds rise with the nearest
+        oncoming vehicle's time to the conflict (one choice per gap, keyed by that vehicle)."""
+        if self.cfg.get("DT_V3") and veh.commit == "left_gap":
+            occ = self._conflict_occupied(veh, conn)
+            if occ < 0:   # ... or an oncoming car arrives within R3's check while the turner is short of its line
+                tau, who, inside = self._oncoming_gap(ln, conn)
+                if inside is not None or (who is not None and tau < self.cfg["R3_GAP_CHECK"] + 0.3):
+                    occ = (inside or who).slot
+            if occ < 0:
+                return True, -1
+            self._cancel(veh, occ)
+            return False, occ
+        best, who, inside = self._oncoming_gap(ln, conn)
+        if inside is not None:
+            return False, inside.slot
         if who is None:
             return True, -1
         if self.cfg.get("DT_V3"):
@@ -1637,6 +1687,8 @@ class Sim:
                 if veh.front >= veh.off[i] + ln.stop["s"]:
                     veh.entered, veh.enter_time = True, self.t
                     veh.commit = None
+                    if veh.route_pending:
+                        veh.route_pending, veh.ind_pending = False, veh.turn in ("L", "R")
                     self._event("ENTER", veh.slot, -1, {"L": 1, "S": 2, "R": 3}.get(veh.turn, 0))
                     if self.violation in ("red", "left_gap", "no_stop") and self.frame >= self.viol_from:
                         self._truth_at_line(veh, ln)

@@ -755,6 +755,8 @@ def _insert_ego_v2(sim, plan, rng):
     if ln.stop is not None:            # route and indicator decided before frame 0
         ego.turn_w = {t: float(t == plan["turn"]) + 1e-9 for t in "LSR"}
         sim._decide_route(ego, ln, indicate=False)   # the indicator comes on at its turn_dist
+        if sim.cfg.get("DT_V3") and len(ln.next) > 1 and plan.get("D") not in ("left turn", "right turn"):
+            ego.route_pending, ego.ind_pending = True, False   # v3 (Issue 6): its move is drawn per future
     v = sim._v0(ego) * rng.uniform(0.8, 1.0) if plan["v"] is None else plan["v"]
     index = sim._lane_index()
     lead, gap = sim._leader(ego, index)
@@ -798,6 +800,7 @@ def _attempt(rng, cfg, tg):
     sim.next_slot = 1                  # slot 0 stays the ego's
     sim.ego_leg = leg
     plan = RECIPES[tmpl](sim, rng, tg)
+    plan.setdefault("D", tg["D"])
     while sim.frame < -1:              # warm-up without the ego
         sim.step_frame()
     _insert_ego_v2(sim, plan, rng)
@@ -811,6 +814,21 @@ def _attempt(rng, cfg, tg):
             br.step_frame()
         branches.append(br)
     return m, branches
+
+
+def route_draws(moves, K, rng):
+    """v3 (Issue 6, D2): the moves of K futures, drawn independently with equal odds."""
+    return [moves[int(i)] for i in rng.randint(len(moves), size=K)]
+
+
+def _route_futures(br, seed, attempt, b, K):
+    """v3: the moves of the K futures of a branch whose ego has not begun its move by the fork, or None."""
+    ego = br.ego
+    if ego is None or not ego.route_pending or ego.entered:
+        return None
+    i, _ = ego.where()
+    moves = [br.m.lanes[x].turn for x in ego.lanes[i].next]
+    return route_draws(moves, K, np.random.RandomState(_fork_seed(seed, attempt, b, 99)))
 
 
 def _fork_seed(seed, attempt, b, k):
@@ -854,6 +872,10 @@ def simulate(seed, cfg, template=None, target=None):
         if sc + 2 <= best_key:
             continue
         fin = [copy.deepcopy(br, memo={id(m): m}) for br in brs]
+        routes = [_route_futures(br, seed, attempt, b, K) for b, br in enumerate(brs)]
+        for br, rt in zip(fin, routes):
+            if rt is not None:
+                br.set_ego_route(rt[0])
         for br in fin:
             while br.frame < total - 1:
                 br.step_frame()
@@ -869,6 +891,8 @@ def simulate(seed, cfg, template=None, target=None):
             for k in range(1, K):
                 fk = copy.deepcopy(br, memo={id(m): m})
                 fk.rng = np.random.RandomState(_fork_seed(seed, attempt, b, k))
+                if routes[b] is not None:
+                    fk.set_ego_route(routes[b][k])
                 while fk.frame < total - 1:
                     fk.step_frame()
                 pk = _pack(fk)
@@ -883,13 +907,14 @@ def simulate(seed, cfg, template=None, target=None):
             forks.append(fb)
             full.append(fr)
         if ok:
-            best, best_key = (m, fin, recs, labs, attempt, forks, full), sc
+            best, best_key = (m, fin, recs, labs, attempt, forks, full, routes), sc
         if best_key == 9 or (attempt >= 9 and best_key >= 8) or (attempt >= 19 and best_key >= 6):
             break
     if best is None:
         return dict(map=None, ok=False, tries=cfg["DT_TRIES"], target=target)
-    m, fin, recs, labs, attempt, forks, full = best
+    m, fin, recs, labs, attempt, forks, full, routes = best
     return dict(map=m, template=target["template"], branches=recs, forks=forks, fork_recs=full, tries=attempt + 1, ok=True, labels=labs,
+                route_draws=routes,
                 target=target, colors={u.slot: u.color for u in fin[0].vehicles + fin[0].peds + fin[0].gone})
 
 
