@@ -204,9 +204,11 @@ def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_
         for j in range(n_lanes - 1):
             inc[k, j].right, inc[k, j + 1].left = inc[k, j + 1].id, inc[k, j].id
             out[k, j].right, out[k, j + 1].left = out[k, j + 1].id, out[k, j].id
-            # no lane changes on the approach (lanes are chosen by movement)
-            inc[k, j].solid_right = [(0.0, inc[k, j].length)]
-            inc[k, j + 1].solid_left = [(0.0, inc[k, j + 1].length)]
+            # no lane changes on the approach (lanes are chosen by movement); v3: the line, and so
+            # the ban, is solid for the last 30 m only, like its markings
+            s0 = inc[k, j].length - 30.0 if v3 else 0.0
+            inc[k, j].solid_right = [(s0, inc[k, j].length)]
+            inc[k, j + 1].solid_left = [(s0, inc[k, j + 1].length)]
         if v3 and n_lanes == 2:   # v3: the left-only lane carries left_share of the approach
             inc[k, 0].inflow_w, inc[k, 1].inflow_w = 2 * left_share, 2 * (1 - left_share)
 
@@ -268,11 +270,8 @@ def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_
                                        pts=np.stack([ln.pos(ln.length - 9.0), ln.pos(ln.length - 4.0)])))
         m.markings.append(dict(style="double_yellow", pts=(R @ np.array([[0.0, -L], [0.0, -y_stop]]).T).T))
         for j in range(1, n_lanes):
-            if v3:   # v3: solid along the whole approach, like the ban on lane changes
-                m.markings.append(dict(style="solid_white", pts=(R @ np.array([[j * LANE_W, -L], [j * LANE_W, -y_stop]]).T).T))
-            else:
-                m.markings.append(dict(style="solid_white", pts=(R @ np.array([[j * LANE_W, -y_stop - 30], [j * LANE_W, -y_stop]]).T).T))
-                m.markings.append(dict(style="dashed_white", pts=(R @ np.array([[j * LANE_W, -L], [j * LANE_W, -y_stop - 30]]).T).T))
+            m.markings.append(dict(style="solid_white", pts=(R @ np.array([[j * LANE_W, -y_stop - 30], [j * LANE_W, -y_stop]]).T).T))
+            m.markings.append(dict(style="dashed_white", pts=(R @ np.array([[j * LANE_W, -L], [j * LANE_W, -y_stop - 30]]).T).T))
             m.markings.append(dict(style="dashed_white", pts=(R @ np.array([[-j * LANE_W, -y_out], [-j * LANE_W, -L]]).T).T))
         for side in (-1, 1):
             m.markings.append(dict(style="edge", pts=(R @ np.array([[side * half, -L], [side * half, -inner]]).T).T))

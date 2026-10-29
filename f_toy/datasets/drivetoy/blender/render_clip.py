@@ -414,7 +414,7 @@ def _trees(geo, sc, rng):
             h = rng.uniform(3.5, 6.0)
             r = rng.uniform(1.2, 2.0)
             leaf = leaves[rng.randint(3)]
-            if crown_blocks((q[0], q[1], h * 0.72), r, sight):   # v3: drawn but left out
+            if crown_blocks((q[0], q[1], h * 0.72), r, sight, margin=0.6):   # v3: drawn but left out; 0.6 m covers a sign face
                 skipped += 1
                 continue
             geo.add(g_cyl(q[0], q[1], 0.15, h * 0.6, 0.15), trunk)

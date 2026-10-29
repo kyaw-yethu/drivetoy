@@ -36,6 +36,24 @@ def test_map_round_trip():
         print(tmpl, len(m.lanes), "lanes,", len(json.dumps(map_to_dict(m))) // 1024, "KB")
 
 
+def test_round_trip_with_violations():
+    """rules.check gives the same violations on the loaded map, on a record that has some."""
+    cfg = dict(V3, DT_VIOLATION="red")
+    for seed in range(6200, 6230):
+        row = next(r for r in COMBOS if r[2] == "signal4" and r[0] == "steady red")
+        A, B, tmpl, D, C, E, V = row
+        res = simulate(seed, cfg, target=dict(A=A, B=B, C=C, D=D, E=E, V=V, template=tmpl))
+        if not res["ok"]:
+            continue
+        m, rec = res["map"], res["branches"][0]
+        v = check(rec, m, cfg)
+        if v:
+            assert check(rec, map_from_dict(json.loads(json.dumps(map_to_dict(m)))), cfg) == v
+            print("violations compared:", len(v))
+            return
+    raise AssertionError("no record with violations found")
+
+
 def test_save_load_gz(tmp="/tmp/test_v3_map.json.gz"):
     row = next(r for r in COMBOS if r[2] == "signal4")
     A, B, tmpl, D, C, E, V = row

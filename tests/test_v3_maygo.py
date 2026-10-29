@@ -39,9 +39,9 @@ def _job(job):
         turn = next((m.lanes[int(l)].turn for l in rec["routes"][0] if l >= 0 and m.lanes[int(l)].kind == "conn"), None)
         for f in range(rec["agents"].shape[0]):
             n_go += int(mg[f] == 1)
-            if f > enter and mg[f] != -1:
-                bad.append((k, f, "not -1 after entering", int(mg[f])))
-            if f < enter and lane0 is not None and lane0.stop and lane0.stop["control"] == "signal":
+            if lane0 is not None and lane0.stop and mg[f] == -1:
+                bad.append((k, f, "undefined although the route has a stop line", f > enter))
+            if lane0 is not None and lane0.stop and lane0.stop["control"] == "signal":
                 ball, arrow = rec["signals"][f, m.groups.index(lane0.stop["group"]), :2]
                 if int(ball) == BALL_R and not (arrow > 0 and turn == "L") and (mg[f], why[f]) != (0, LIGHT):
                     bad.append((k, f, "red but", int(mg[f]), MAY_GO_REASONS[int(why[f])]))

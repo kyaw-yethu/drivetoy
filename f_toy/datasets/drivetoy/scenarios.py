@@ -17,6 +17,7 @@ import copy
 import numpy as np
 
 from .diversity import clip_labels, cue_problems, overtake_problems
+from .rules import check as rules_check
 from .roads import build_map
 from .choices import DEC_COLS, DRIVER_COLS, end_label
 from .sim import EV, P_CROSS, P_WAIT, RS, Sim, VEH_KINDS
@@ -379,7 +380,7 @@ def _recipe_signal4(sim, rng, tg):
         # B none: turns at once; B signal / lead vehicle: waits, enters late in the clip, turns after 31
         t_a = _u(rng, -1.0, 1.5) if C == "slow down" else \
             {"signal": _u(rng, 3.8, 5.0), "lead vehicle": _u(rng, 2.5, 3.5)}.get(B, _u(rng, 0.3, 1.2))
-        over[(own, "A")] = _u(rng, 4.5, 6.5)
+        over[(own, "A")] = _u(rng, 6.0, 8.0) if cfg.get("DT_V3") else _u(rng, 4.5, 6.5)   # v3: 6 to 8 s arrows
         sched = (own, "A", t_a)
         d_line = dict(**{"pull away": _u(rng, 0.8, 2.0), "stop and go": _u(rng, 12.0, 30.0), "slow down": _u(rng, 15.0, 35.0)}).get(C, 15.0)
         stopped_at_line = C == "pull away"
@@ -888,8 +889,18 @@ def simulate(seed, cfg, template=None, target=None):
         recs = [_pack(br) for br in fin]
         for l, r in zip(labs, recs):
             l["E"] = end_label(r["decisions"], T0, T0 + 9)
-        sc += 2 * (labs[0]["E"] == target.get("E", labs[0]["E"]))
-        if sc <= best_key or not all(not r["ran_out"] and not cue_problems(r, m, cfg) for r in recs):
+        e_sel = [l["E"] for l in labs]
+        if cfg.get("DT_V3"):   # v3: E is judged on the provisional route, never on the move drawn for future 0
+            for b, (br, rt) in enumerate(zip(brs, routes)):
+                if rt is not None:
+                    prov = copy.deepcopy(br, memo={id(m): m})
+                    while prov.frame < total - 1:
+                        prov.step_frame()
+                    e_sel[b] = end_label(_pack(prov)["decisions"], T0, T0 + 9)
+        sc += 2 * (e_sel[0] == target.get("E", e_sel[0]))
+        lawful = cfg.get("DT_V3") and not cfg.get("DT_VIOLATION")   # v3: no rule broken in any record
+        if sc <= best_key or not all(not r["ran_out"] and not cue_problems(r, m, cfg) and not (lawful and rules_check(r, m, cfg))
+                                     for r in recs):
             continue
         forks, full, ok = [], [], True
         for b, br in enumerate(brs):
@@ -902,7 +913,7 @@ def simulate(seed, cfg, template=None, target=None):
                 while fk.frame < total - 1:
                     fk.step_frame()
                 pk = _pack(fk)
-                if pk["ran_out"] or cue_problems(pk, m, cfg):
+                if pk["ran_out"] or cue_problems(pk, m, cfg) or (lawful and rules_check(pk, m, cfg)):
                     ok = False
                     break
                 fb.append(_future(pk, T0))

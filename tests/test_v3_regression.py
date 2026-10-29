@@ -15,7 +15,10 @@ def test_v2s_val_resimulates():
     v2s_checks.ROOT = V2S_VAL
     v2s_checks.META = json.loads((V2S_VAL / "meta.json").read_text())
     assert "DT_V3" not in v2s_checks.META["cfg"]
-    for n in (0, 500):
+    import numpy as np
+    tmpl = np.load(V2S_VAL / "annotations.npz")["template"]
+    for t in range(4):
+        n = int(np.where(tmpl == t)[0][0])
         assert v2s_checks.resim(n)[1], n
 
 

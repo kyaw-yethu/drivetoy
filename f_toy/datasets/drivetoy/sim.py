@@ -738,7 +738,8 @@ class Sim:
                         zb0, zb1 = self.m.conflicts[(b, a)]
                         # priority to whoever entered the junction first, until it has cleared the zone
                         if us - u.L / 2 <= zb1 + 0.5 and u.enter_time is not None \
-                                and u.enter_time < veh.enter_time and \
+                                and (u.enter_time < veh.enter_time or (cfg.get("DT_V3") and u.enter_time == veh.enter_time
+                                                                       and veh.turn == "L" and u.turn != "L")) and \
                                 veh.v ** 2 / (2 * max(d_z - 0.5, 0.05)) <= cfg["DT_B_MAX"]:
                             cands.append((self._idm_stop(veh, v0, d_z - 1.0), RS["YIELD_CONFLICT"], u.slot))
         # ---- lane drop: stop before the end if the merge has not happened ----
@@ -934,7 +935,10 @@ class Sim:
                 continue
             z = self.m.conflicts.get((uconn.id, conn.id)) if uconn is not None else None
             dist = (ul.stop["s"] - (usl + u.L / 2)) + (z[0] if z is not None else 6.0)
-            tta = dist / max(u.v, 1.0)
+            if self.cfg.get("DT_V3"):   # v3: a car pulling away is expected to speed up
+                tta = _time_to_cover(dist, u.v, u.a, max(ul.limit * u.v0f(), u.v))
+            else:
+                tta = dist / max(u.v, 1.0)
             if tta < min(best, 12.0):
                 best, who = tta, u
         return best, who, None
@@ -1818,13 +1822,14 @@ class Sim:
         now: (1, 0), (0, index into MAY_GO_REASONS), or (-1, 0) when it has no stop line ahead or has
         entered. An open route needs every move its lane allows. Reads state only; draws nothing."""
         ego = self.ego
-        if ego is None or ego.entered:
+        if ego is None:
             return -1, 0
-        i, _ = ego.where()
-        ln = ego.lanes[i]
-        if ln.kind != "in" or ln.stop is None or i + 1 >= len(ego.lanes):
+        # the stop line on the ego's route, also after the logged ego has passed it: a plan may still wait there
+        j = next((k for k, l in enumerate(ego.lanes) if l.kind == "in" and l.stop is not None), None)
+        if j is None or j + 1 >= len(ego.lanes):
             return -1, 0
-        conns = [self.m.lanes[x] for x in ln.next] if ego.route_pending else [ego.lanes[i + 1]]
+        ln = ego.lanes[j]
+        conns = [self.m.lanes[x] for x in ln.next] if ego.route_pending else [ego.lanes[j + 1]]
         signal = ln.stop["control"] == "signal"
         arrow = False
         if signal:
@@ -1855,6 +1860,16 @@ class Sim:
                 z = self.m.conflicts.get((uc.id, c.id))
                 if z is not None and us - u.L / 2 <= z[1]:
                     return 0, MAY_GO_REASONS.index("conflict")
+        for u in self.vehicles:   # a car already let through on a conflicting path, or the exit backed up
+            if u is ego or u.parked:
+                continue
+            ui, usl = u.where()
+            ul = u.lanes[ui]
+            if u.granted and not u.entered and not u.route_open and ui + 1 < len(u.lanes):
+                if any((u.lanes[ui + 1].id, c.id) in self.m.conflicts for c in conns):
+                    return 0, MAY_GO_REASONS.index("conflict")
+            if any(c.next and ul.id == c.next[0] and usl - u.L / 2 < ego.L + 2.0 for c in conns):
+                return 0, MAY_GO_REASONS.index("conflict")
         if not signal:   # D3: no car waiting at another approach is moving
             for u in self.vehicles:
                 if u is ego or u.entered or u.arrival is None:
@@ -1870,6 +1885,20 @@ class Sim:
         for u in self.vehicles:
             out[u.slot] = list(u.route)
         return out
+
+
+def _time_to_cover(d, v, a, vmax):
+    """v3: time to cover d metres from speed v, accelerating at a up to vmax."""
+    if d <= 0.0:
+        return 0.0
+    a = max(a, 0.1)
+    if v >= vmax:
+        return d / max(v, 0.1)
+    t1 = (vmax - v) / a
+    d1 = v * t1 + 0.5 * a * t1 * t1
+    if d1 >= d:
+        return float((-v + np.sqrt(v * v + 2 * a * d)) / a)
+    return float(t1 + (d - d1) / vmax)
 
 
 def _pathlen(pts):

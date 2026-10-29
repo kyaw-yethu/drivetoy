@@ -107,10 +107,14 @@ def _sample(n):
                 if ln.kind == "in":
                     first[s] = ln.lane_index
         out["inner"] = [sum(x == 0 for x in first.values()), len(first)]
+    yo = np.where(st[:, 0] == RS["YIELD_ONCOMING"])[0]
+    out["ego_left"] = None if not len(yo) else dict(
+        done=0 in enters, waits_all_futures=bool((FS["rule_state"][n][:, -1] == RS["YIELD_ONCOMING"]).all()))
     # 6. routes drawn per future
     out["route_drawn"] = bool(ANN["route_drawn"][n])
     if out["route_drawn"]:
-        out["moves"] = sorted({"-LSR"[int(x)] for x in FS["ego_turn"][n]})
+        out["future_moves"] = ["-LSR"[int(x)] for x in FS["ego_turn"][n]]
+        out["moves"] = sorted(set(out["future_moves"]))
         out["ind_before"] = int(a["lamps"][:T0 + 1, 0, 1:3].sum())
     # 7. didn't go when the way was clear (task_encoder_eval.md), logged ego
     out["didnt_go"] = _didnt_go(a, m)
@@ -143,7 +147,10 @@ def _didnt_go(a, m):
             run = 0
             continue
         ln = m.lanes[lid]
-        stop_sign = ln.stop is not None and ln.stop["control"] == "stop"
+        if ln.kind != "in" or ln.stop is None or sl[f, 0] + ag[f, 0, 6] / 2 > ln.stop["s"] + 0.5:
+            run = 0   # not at or before its stop line
+            continue
+        stop_sign = ln.stop["control"] == "stop"
         if stop_sign:
             mine = _stand_start(v[:, 0], f)
             first = False
@@ -213,11 +220,14 @@ def main():
         "3_gaps": dict(n=len(gaps), min_s=min(gaps) / FPS if gaps else None,
                        under_3s=round(float(np.mean(np.array(gaps) < 15)), 3) if gaps else None,
                        tail_mean_s=round(float(np.mean(np.array(gaps) / FPS - 2.0)), 2) if gaps else None,
-                       yielding_left_turners_done=f"{sum(yielders)}/{len(yielders)}"),
+                       yielding_left_turners_done=f"{sum(yielders)}/{len(yielders)}",
+                       ego_yielding_done=f"{sum(s['ego_left']['done'] for s in S if s['ego_left'])}/{sum(bool(s['ego_left']) for s in S)}",
+                       ego_waits_in_all_futures=sum(s["ego_left"]["waits_all_futures"] for s in S if s["ego_left"])),
         "4_left_lane_share": round(float(inner[0] / max(inner[1], 1)), 3),
         "5_trees_skipped": dict(clips=len(trees), total=sum(trees), mean=round(float(np.mean(trees)), 2) if trees else None),
         "6_routes": dict(drawn=len(drawn), with_2plus_moves=sum(len(s["moves"]) >= 2 for s in drawn),
-                         move_shares=dict(Counter(mv for s in drawn for mv in s["moves"])),
+                         future_move_shares={k: round(v / max(1, 16 * len(drawn)), 3)
+                                             for k, v in Counter(mv for s in drawn for mv in s["future_moves"]).items()},
                          indicator_before_32=sum(s["ind_before"] > 0 for s in drawn)),
         "7_labels": dict(maps=len(list((ROOT / "maps").glob("*.json.gz"))), samples=N,
                          may_go_shape=list(ANN["may_go"].shape), future_may_go_shape=list(FS["may_go"].shape),

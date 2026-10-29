@@ -26,12 +26,19 @@ def _approach_lines(m, style):
     return out
 
 
-def test_solid_approach():
+def test_solid_near_junction():
+    """Issue 4: the line is solid for the last 30 m before the stop line and dashed before it, and the
+    ban on lane changes (solid intervals of the lanes) covers the same 30 m."""
     m = build_signal4(np.random.RandomState(0), V3)
-    assert all(not v for v in _approach_lines(m, "dashed_white").values())
-    for k, lines in _approach_lines(m, "solid_white").items():
-        assert len(lines) == 1, (k, lines)
-        assert np.isclose(lines[0].min(), -200.0) and np.isclose(lines[0].max(), -m.intersection["stop"]), (k, lines)
+    stop = m.intersection["stop"]
+    for k in range(4):
+        solid, dashed = _approach_lines(m, "solid_white")[k], _approach_lines(m, "dashed_white")[k]
+        assert len(solid) == 1 and len(dashed) == 1, (k, solid, dashed)
+        assert np.isclose(solid[0].min(), -stop - 30.0) and np.isclose(solid[0].max(), -stop)
+        assert np.isclose(dashed[0].min(), -200.0) and np.isclose(dashed[0].max(), -stop - 30.0)
+    for ln in m.lanes:
+        if ln.kind == "in" and ln.lane_index == 0:
+            assert ln.solid_right == [(ln.length - 30.0, ln.length)], ln.solid_right
 
 
 def test_left_share():
@@ -49,11 +56,11 @@ def test_left_share():
         rate.append(sum(sim.inflow[i] for i in inner) / sum(sim.inflow[i] for i in inner | outer))
     share, mean_rate = placed[0] / placed[1], float(np.mean(rate))
     print(f"inner lane: share of placed vehicles {share:.3f}, share of inflow {mean_rate:.3f}")
-    assert 0.20 <= share <= 0.30 and 0.20 <= mean_rate <= 0.30
+    assert 0.30 <= share <= 0.40 and 0.30 <= mean_rate <= 0.40   # Issue 4: about 35%
 
 
-def test_arrow_unchanged():
-    assert V3["SIG_ARROW_P"] == 0.5 and V3["SIG_ARROW"] == (3.0, 5.0)
+def test_arrow_v3():
+    assert V3["SIG_ARROW_P"] == 0.5 and V3["SIG_ARROW"] == (6.0, 8.0)   # Issue 4: half of the maps, 6 to 8 s
     m = build_signal4(np.random.RandomState(1), V3, protected=True)
     seq = Signals(m, V3, np.random.RandomState(1), 0.0).seq
     for g in m.groups:

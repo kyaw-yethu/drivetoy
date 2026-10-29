@@ -164,11 +164,12 @@ DRIVETOY_DEFAULT_CFG = dict(
     DT_OVERTAKE_EGO_FRAC=(0.90, 0.97),  # v3: ... and the overtaking ego at this one
     DT_ONCOMING_MIN=2.0,     # v3: oncoming headway = this minimum (s) ...
     DT_ONCOMING_MEAN=(4.0, 8.0),        # v3: ... plus an exponential tail with a mean drawn here per clip (s)
-    DT_LEFT_SHARE=0.25,      # v3: share of a signal4 approach's traffic in its left-only lane
+    DT_LEFT_SHARE=0.35,      # v3: share of a signal4 approach's traffic in its left-only lane
 
     SEED=0,
 )
 
 # v3 builds: the switch plus the prompter starts (D6): a full stop of 0.8 s at a stop sign and
 # 0.2 to 0.6 s before moving off once the way is clear
-V3_OVERRIDES = dict(DT_V3=True, R4_STOP_TIME=0.8, DT_START_DELAY=(0.2, 0.6))
+V3_OVERRIDES = dict(DT_V3=True, R4_STOP_TIME=0.8, DT_START_DELAY=(0.2, 0.6),
+                    SIG_ARROW=(6.0, 8.0))   # Issue 4: half of the maps keep a 6 to 8 s green arrow
