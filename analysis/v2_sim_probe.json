@@ -1,0 +1,1100 @@
+{
+ "('no light', 'none', 'multilane', 'straight', 'cruise')": [
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 1.8658180236816406,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.0899460315704346,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 2.580360174179077,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 1.5974245071411133,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 2.07316255569458,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 6.09512186050415,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 2.373175621032715,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.205167055130005,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 2.534301280975342,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 2.8189404010772705,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 7.906322479248047,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 5.791977643966675,
+   "A": "no light",
+   "B": "none",
+   "C": "cruise",
+   "D": "straight",
+   "viol": []
+  }
+ ],
+ "('no light', 'lead vehicle', 'multilane', 'straight', 'slow down')": [
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.584031820297241,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 6.165393352508545,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 6.792395114898682,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 6.598098278045654,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 7.292280673980713,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 8.50722074508667,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 9.311572551727295,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.066845655441284,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 11.035921812057495,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 11.20347785949707,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 11.907397747039795,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 5,
+   "sec": 13.082953214645386,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  }
+ ],
+ "('no light', 'lane end', 'multilane', 'merge', 'slow down')": [
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.625427007675171,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.73234486579895,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.007642030715942,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.110119342803955,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.237699270248413,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.816445827484131,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 7.509113550186157,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 9.619598150253296,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 9.910186290740967,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 10.592782020568848,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 11.86446237564087,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 11,
+   "sec": 20.222469329833984,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "merge",
+   "viol": []
+  }
+ ],
+ "('no light', 'lead vehicle', 'multilane', 'straight', 'follow')": [
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.8614907264709473,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.991424798965454,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.41606593132019,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 6.178471803665161,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 6.306546449661255,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 7.3109846115112305,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 7.539568185806274,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 7.69164776802063,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 7.8700971603393555,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.243043661117554,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 11.29967737197876,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 12.375856876373291,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  }
+ ],
+ "('no light', 'cut-in vehicle', 'multilane', 'straight', 'follow')": [
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 3.9970600605010986,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.4873363971710205,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 6.875888824462891,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 8.782477617263794,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.145806550979614,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.461565494537354,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 11.659521579742432,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 11.383100748062134,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 12.256654024124146,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 12.45229458808899,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 14.94899034500122,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 6,
+   "sec": 15.353438377380371,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  }
+ ],
+ "('no light', 'lane end', 'multilane', 'straight', 'slow down')": [
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 4.6125524044036865,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 5.410160064697266,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.434065103530884,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.665237426757812,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 12.190443277359009,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 12.879515647888184,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 5,
+   "sec": 14.542873620986938,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 5,
+   "sec": 14.45256233215332,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 14.67093539237976,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 7,
+   "sec": 20.026397228240967,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 8,
+   "sec": 21.092153787612915,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 13,
+   "sec": 25.45755124092102,
+   "A": "no light",
+   "B": "lane end",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  }
+ ],
+ "('no light', 'cut-in vehicle', 'multilane', 'straight', 'slow down')": [
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 9.322786331176758,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 10.0272376537323,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 14.150773048400879,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 6,
+   "sec": 15.480566263198853,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 7,
+   "sec": 18.63080883026123,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 8,
+   "sec": 18.86739206314087,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 7,
+   "sec": 18.719808340072632,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 12,
+   "sec": 22.87790584564209,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 12,
+   "sec": 23.14365839958191,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 32.816306829452515,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 18,
+   "sec": 33.025954723358154,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "slow down",
+   "D": "straight",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 33.8349826335907,
+   "A": "no light",
+   "B": "cut-in vehicle",
+   "C": "follow",
+   "D": "straight",
+   "viol": []
+  }
+ ],
+ "('no light', 'lead vehicle', 'multilane', 'lane change', 'cruise')": [
+  {
+   "ok": true,
+   "tries": 4,
+   "sec": 12.681344747543335,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 6,
+   "sec": 13.021642923355103,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 5,
+   "sec": 14.280661821365356,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 5,
+   "sec": 15.514334678649902,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 9,
+   "sec": 18.944714784622192,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 11,
+   "sec": 22.240772008895874,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 11,
+   "sec": 22.217910766601562,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 20,
+   "sec": 32.3516948223114,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "cruise",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 32.8814377784729,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 33.45153260231018,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 33.223570823669434,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 34.398144006729126,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  }
+ ],
+ "('no light', 'lead vehicle', 'multilane', 'lane change', 'follow')": [
+  {
+   "ok": true,
+   "tries": 8,
+   "sec": 16.987414360046387,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 15,
+   "sec": 27.55461549758911,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "follow",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 28.982722282409668,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 30.411181926727295,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 30.951420307159424,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 2,
+   "sec": 32.81150555610657,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 32.7700092792511,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 33.247440338134766,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 33.35966730117798,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 33.21225070953369,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 3,
+   "sec": 33.815043926239014,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  },
+  {
+   "ok": true,
+   "tries": 1,
+   "sec": 35.13657784461975,
+   "A": "no light",
+   "B": "lead vehicle",
+   "C": "slow down",
+   "D": "lane change",
+   "viol": []
+  }
+ ]
+}

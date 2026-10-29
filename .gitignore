@@ -1,0 +1,5 @@
+__pycache__/
+*.gif
+*.mp4
+analysis/wide_aspect_v1/
+.superpowers/
