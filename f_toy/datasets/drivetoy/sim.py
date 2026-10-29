@@ -31,7 +31,7 @@ RULE_STATES = ["GO", "FOLLOW", "STOP_SIGNAL", "STOP_SIGN", "YIELD_ONCOMING", "YI
 RS = {n: i for i, n in enumerate(RULE_STATES)}
 
 EVENTS = ["SIGNAL", "TURN_ON", "LC_START", "STOP", "GO", "YIELD", "ENTER", "PED_DECIDE", "PED_CROSS",
-          "LET_IN", "INDICATOR_OFF", "VIOLATE", "WAVE"]
+          "LET_IN", "INDICATOR_OFF", "VIOLATE", "WAVE", "CANCEL"]
 
 # Violation sets (docs/DRIVETOY.md §9): DT_VIOLATION switches one rule off for
 # every agent after DT_BRANCH_FRAME, so the context stays lawful. Each illegal
@@ -196,6 +196,7 @@ class Vehicle:
         self.patience = biased(rng, cfg["DT_PATIENCE"], self.style, cfg["DT_STYLE_CORR"], up=False)
         self.choices = {}          # kind -> (key, outcome) of its latest major choice
         self.go_at = None          # start-up delay: when a stopped vehicle may move off
+        self.commit = None         # v3: the "go" choice it committed to (left_gap, rtor, stop_wave)
         self.rtor_stop, self.rtor_ready, self.rtor_on = 0.0, False, False   # right turn on red
         self.behind_since = None   # overtaker: since when it is held up behind a slow leader
         self.ind_pending = False   # turn decided, indicator not on yet (it comes on at turn_dist)
@@ -822,7 +823,14 @@ class Sim:
             for s0, s1, cw in conn.crosswalks:
                 if cw in ped_entering:
                     return False, RS["YIELD_PED"], ped_entering[cw]
-        blocker = None if (self._viol("left_gap") and conn.turn == "L") else self._conflict_blocker(veh, conn, index)
+        if self.cfg.get("DT_V3") and veh.commit in ("left_gap", "rtor"):
+            occ = self._conflict_occupied(veh, conn)
+            if occ >= 0:
+                self._cancel(veh, occ)
+                return False, RS["YIELD_CONFLICT"], occ
+            blocker = None
+        else:
+            blocker = None if (self._viol("left_gap") and conn.turn == "L") else self._conflict_blocker(veh, conn, index)
         if blocker is not None:
             return False, RS["YIELD_CONFLICT"], blocker.slot
         out = self.m.lanes[conn.next[0]]
@@ -842,6 +850,12 @@ class Sim:
         """R3: oncoming through or right traffic. Nobody inside the conflict and nobody within
         DT_GAP_FLOOR s of it; then taking the gap is a choice whose odds rise with the nearest
         oncoming vehicle's time to the conflict (one choice per gap, keyed by that vehicle)."""
+        if self.cfg.get("DT_V3") and veh.commit == "left_gap":
+            occ = self._conflict_occupied(veh, conn)
+            if occ < 0:
+                return True, -1
+            self._cancel(veh, occ)
+            return False, occ
         ko = (ln.leg + 2) % 4
         best, who = np.inf, None
         for u in self.vehicles:
@@ -870,9 +884,51 @@ class Sim:
                 best, who = tta, u
         if who is None:
             return True, -1
+        if self.cfg.get("DT_V3"):
+            # v3: the gap is judged at the line, as the time the oncoming car still needs once the
+            # turner gets there, so a committed turner crosses its line with that gap left (R3)
+            i = veh.route.index(ln.id)
+            d = max(veh.off[i] + ln.stop["s"] - veh.front, 0.0)
+            t_reach = d / veh.v if veh.v >= 1.0 else \
+                float(np.mean(self.cfg["DT_START_DELAY"])) + float(np.sqrt(2 * d / max(veh.a, 0.5)))
+            best -= t_reach
+            if best >= self.cfg["DT_GAP_FLOOR"] and d > 3.5:
+                return True, -1   # still approaching: the choice is made at the line
         if best < self.cfg["DT_GAP_FLOOR"]:
             return False, who.slot
-        return self.decide(veh, "left_gap", best, key=who.slot, other=who), who.slot
+        go = self.decide(veh, "left_gap", best, key=who.slot, other=who)
+        if go and self.cfg.get("DT_V3"):
+            veh.commit = "left_gap"
+        return go, who.slot
+
+    def _conflict_occupied(self, veh, conn):
+        """v3: the gap has truly closed: slot of a vehicle whose body lies inside a conflict area of
+        ``conn``, or that can no longer stop before it at R1_STOP_DECEL; -1 if there is none. This
+        is the one thing that cancels a committed go."""
+        for u in self.vehicles:
+            if u is veh or u.parked:
+                continue
+            ui, usl = u.where()
+            ul = u.lanes[ui]
+            if ul.kind == "conn":
+                uc, us = ul, usl
+            elif ul.kind == "in" and not u.route_open and ui + 1 < len(u.lanes) and u.lanes[ui + 1].kind == "conn":
+                uc, us = u.lanes[ui + 1], usl - ul.length   # still on its approach: the connector ahead
+            else:
+                continue
+            z = self.m.conflicts.get((uc.id, conn.id))
+            if z is None or us - u.L / 2 > z[1]:
+                continue
+            ahead = z[0] - (us + u.L / 2)
+            if ahead <= 0.0 or u.v ** 2 / (2 * max(ahead - 0.5, 0.05)) > self.cfg["R1_STOP_DECEL"]:
+                return u.slot
+        return -1
+
+    def _cancel(self, veh, other):
+        """v3: drop a committed go (the gap has closed); the next gap is a new choice."""
+        veh.choices.pop(veh.commit, None)
+        veh.commit = None
+        self._event("CANCEL", veh.slot, other)
 
     # ----- stochastic choices at lines, gaps and crosswalks ------------------
     def _yellow_choice(self, veh, d_line):
@@ -902,6 +958,13 @@ class Sim:
         traffic within DT_GAP_FLOOR s of the conflict, going is a choice whose odds rise with the gap."""
         if not self.cfg.get("DT_RTOR") or conn.turn != "R":
             return False
+        if self.cfg.get("DT_V3") and veh.commit == "rtor":
+            occ = self._conflict_occupied(veh, conn)
+            if occ < 0:
+                return True
+            self._cancel(veh, occ)
+            veh.rtor_on = False
+            return False
         if veh.rtor_on and veh.granted:
             return True
         if not veh.rtor_ready:
@@ -913,6 +976,8 @@ class Sim:
             veh.rtor_on = True
         else:
             veh.rtor_on = self.decide(veh, "rtor", tta, key=who.slot, other=who)
+            if veh.rtor_on and self.cfg.get("DT_V3"):
+                veh.commit = "rtor"
         return veh.rtor_on
 
     def _cross_tta(self, veh, conn):
@@ -1056,6 +1121,13 @@ class Sim:
         """The vehicle whose turn it is at the all-way stop. It may wave through a car that came
         to its full stop at most DT_WAVE_WINDOW s later on another approach: going in turn is a
         choice whose odds rise with how much later that car arrived (a WAVE event otherwise)."""
+        if self.cfg.get("DT_V3"):   # a car already let through, then one that chose to go in turn, keeps its turn
+            for u in self.vehicles:
+                if u.arrival is not None and u.granted and not u.entered:
+                    return u
+            for u in self.vehicles:
+                if u.commit == "stop_wave" and not u.entered:
+                    return u
         first = self._stop_order()
         if first is None or first.arrival is None:
             return first
@@ -1066,6 +1138,8 @@ class Sim:
             return first
         other = min(near, key=lambda u: (u.arrival, u.slot))
         if self.decide(first, "stop_wave", max(other.arrival - first.arrival, 0.0), key=other.slot, other=other):
+            if self.cfg.get("DT_V3"):
+                first.commit = "stop_wave"
             return first
         if getattr(first, "waved", None) != other.slot:
             first.waved = other.slot
@@ -1540,6 +1614,7 @@ class Sim:
             if not veh.entered and ln.stop is not None and ln.kind == "in":
                 if veh.front >= veh.off[i] + ln.stop["s"]:
                     veh.entered, veh.enter_time = True, self.t
+                    veh.commit = None
                     self._event("ENTER", veh.slot, -1, {"L": 1, "S": 2, "R": 3}.get(veh.turn, 0))
                     if self.violation in ("red", "left_gap", "no_stop") and self.frame >= self.viol_from:
                         self._truth_at_line(veh, ln)
