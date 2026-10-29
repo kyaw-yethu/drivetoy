@@ -476,7 +476,11 @@ class Sim:
         for lid in self.m.spawn_lanes:
             ln = self.m.lanes[lid]
             end = ln.length - (8.0 if ln.stop else 3.0)
-            s = rng.uniform(5, 30)
+            if self.cfg.get("DT_V3") and lid not in self.gap_lanes:
+                # v3: the first car within one usual gap of the lane start, so a sparse lane keeps its share
+                s = 5.0 + rng.rand() * rng.uniform(12, 70) / max(density, 0.15) / ln.inflow_w
+            else:
+                s = rng.uniform(5, 30)
             while s < end:
                 if not self._blocked(lid, s, 4.0):
                     veh = self.add_vehicle(lid, s)
