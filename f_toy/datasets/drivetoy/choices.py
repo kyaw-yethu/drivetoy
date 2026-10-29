@@ -28,12 +28,13 @@ def biased(rng, rng_range, style, corr, up=True):
     return float(lo + (hi - lo) * u)
 
 
-def driver_values(rng, cfg, style):
-    """Per-driver values (README, "Minor variation"), drawn once when the agent appears."""
+def driver_values(rng, cfg, style, heavy=False):
+    """Per-driver values (README, "Minor variation"), drawn once when the agent appears. v3: trucks
+    and buses (``heavy``) draw their desired speed from DT_V0_FRAC_HEAVY."""
     c = cfg["DT_STYLE_CORR"]
     lanes = cfg["DT_LANE_OFFSET"], cfg["DT_LANE_DRIFT"], cfg["DT_SPEED_DRIFT"], cfg["DT_TURN_OFFSET"]
     return dict(
-        v0frac=biased(rng, cfg["DT_V0_FRAC"], style, c),
+        v0frac=biased(rng, cfg["DT_V0_FRAC_HEAVY"] if heavy and cfg.get("DT_V3") else cfg["DT_V0_FRAC"], style, c),
         T=biased(rng, cfg["DT_IDM_T"], style, c, up=False),
         s0=biased(rng, cfg["DT_IDM_S0"], style, c, up=False),
         a=biased(rng, cfg["DT_IDM_A"], style, c),

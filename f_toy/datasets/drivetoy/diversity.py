@@ -122,7 +122,23 @@ def follow_binds(rec, f, y, gap_m, gap_s=0.0):
     return gap <= max(gap_m, gap_s * float(rec["ego"][f, 3]))
 
 
-def overtake_problems(rec, T):
+def follow_gaps(cfg=None):
+    """(metres, seconds) within which the speed label "follow" binds: 7 m, or in v3 a bumper gap
+    of at most DT_FOLLOW_GAP_S (2 s) at the ego's speed."""
+    if cfg is not None and cfg.get("DT_V3"):
+        return 0.0, float(cfg["DT_FOLLOW_GAP_S"])
+    return FOLLOW_GAP, 0.0
+
+
+def lead_gaps(cfg=None):
+    """(metres, seconds) for the causes "lead vehicle", "parked obstacle" and the overtake check:
+    10 m, or in v3 10 m or 2 s, whichever is larger."""
+    if cfg is not None and cfg.get("DT_V3"):
+        return LEAD_GAP, float(cfg["DT_FOLLOW_GAP_S"])
+    return LEAD_GAP, 0.0
+
+
+def overtake_problems(rec, T, cfg=None):
     """For a lane change in frames 0 to T-1 out from behind a leader: the ego must have followed
     that leader within LEAD_GAP metres for at least BIND_MIN frames before it pulls out, so its
     cause is the lead vehicle, and pull out at most LEAD_GAP + 2 m behind it."""
@@ -136,11 +152,12 @@ def overtake_problems(rec, T):
     y = int(ex[t0 - 1, 0, 4])
     if int(ex[t0 - 1, 0, 3]) != RS["FOLLOW"] or y <= 0:
         return ["no leader when the lane change starts"]
-    n = sum(int(ex[f, 0, 3]) == RS["FOLLOW"] and int(ex[f, 0, 4]) == y and follow_binds(rec, f, y, LEAD_GAP)
+    n = sum(int(ex[f, 0, 3]) == RS["FOLLOW"] and int(ex[f, 0, 4]) == y and follow_binds(rec, f, y, *lead_gaps(cfg))
             for f in range(t0))
     out = [f"follows its leader within {LEAD_GAP:.0f} m in {n} frames only"] if n < BIND_MIN else []
     gap = float(np.hypot(*(ag[t0, y, 1:3] - ag[t0, 0, 1:3]))) - (ag[t0, 0, 6] + ag[t0, y, 6]) / 2
-    if gap > LEAD_GAP + 2.0:
+    gm, gs = lead_gaps(cfg)
+    if gap > max(gm, gs * float(rec["ego"][t0, 3])) + 2.0:
         out.append(f"pulls out {gap:.0f} m behind the leader")
     return out
 
@@ -169,7 +186,7 @@ def _nudge_frames(rec, m, T, parked, off_min=0.3, reach=25.0):
     return out
 
 
-def cause_label(rec, m, T, lo=5):
+def cause_label(rec, m, T, lo=5, cfg=None):
     ex = rec["extra"]
     st, yt = ex[lo:T, 0, 3].astype(int), ex[lo:T, 0, 4].astype(int)
     lane, s_loc = ex[lo:T, 0, 0].astype(int), ex[lo:T, 0, 1]
@@ -182,7 +199,7 @@ def cause_label(rec, m, T, lo=5):
         s, y = st[k], yt[k]
         if s == RS["FOLLOW"] and y in cut and cut[y] <= f and follow_binds(rec, f, y, LEAD_GAP, CUTIN_GAP_S):
             bind.append("cut-in vehicle")
-        elif s == RS["FOLLOW"] and follow_binds(rec, f, y, LEAD_GAP):
+        elif s == RS["FOLLOW"] and follow_binds(rec, f, y, *lead_gaps(cfg)):
             bind.append("parked obstacle" if y in parked else "lead vehicle")
         elif s == RS["STOP_SIGNAL"]:
             bind.append("signal")
@@ -214,13 +231,13 @@ def cause_label(rec, m, T, lo=5):
     return str(names[np.argmax(counts)])
 
 
-def speed_label(rec, T):
+def speed_label(rec, T, cfg=None):
     v = rec["ego"][:T, 3]
     stopped = v < STOP_V
     if not stopped.any():
         if max(float(np.max(v[:t + 1]) - v[t]) for t in range(T)) > 3.0:
             return "slow down"
-        follow = sum(int(rec["extra"][f, 0, 3]) == RS["FOLLOW"] and follow_binds(rec, f, int(rec["extra"][f, 0, 4]), FOLLOW_GAP)
+        follow = sum(int(rec["extra"][f, 0, 3]) == RS["FOLLOW"] and follow_binds(rec, f, int(rec["extra"][f, 0, 4]), *follow_gaps(cfg))
                      for f in range(T))
         return "follow" if follow >= T // 2 else "cruise"
     first, last = int(np.argmax(stopped)), T - 1 - int(np.argmax(stopped[::-1]))
@@ -279,8 +296,8 @@ def clip_labels(rec, m, cfg):
     T = cfg["DT_CUE_FRAME"] + 1
     a, a_ok = light_label(rec, m, T)
     d = path_label(rec, m, T)
-    b = "lane end" if d == "merge" else cause_label(rec, m, T)   # a merge is made because its lane ends
-    return dict(A=a, B=b, C=speed_label(rec, T), D=d, a_ok=a_ok)
+    b = "lane end" if d == "merge" else cause_label(rec, m, T, cfg=cfg)   # a merge is made because its lane ends
+    return dict(A=a, B=b, C=speed_label(rec, T, cfg), D=d, a_ok=a_ok)
 
 
 def cue_problems(rec, m, cfg):

@@ -5,7 +5,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.diversity import CUTIN_GAP_S, FOLLOW_GAP, LEAD_GAP, follow_binds
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
+from f_toy.datasets.drivetoy.diversity import CUTIN_GAP_S, FOLLOW_GAP, LEAD_GAP, follow_binds, follow_gaps, lead_gaps
+
+V3 = dict(CFG, **V3_OVERRIDES)
 
 
 def _rec(gap, v):
@@ -27,6 +30,14 @@ def test_follow_binds():
     assert not follow_binds(_rec(10.5, 3.0), 0, 1, LEAD_GAP)
     assert follow_binds(_rec(25.0, 13.0), 0, 1, LEAD_GAP, CUTIN_GAP_S)  # a cut-in binds within 2 s
     assert not follow_binds(_rec(5.0, 13.0), 0, 0, LEAD_GAP)            # no leader
+
+
+def test_v3_follow_time_gap():
+    assert follow_gaps(CFG) == (7.0, 0.0) and lead_gaps(CFG) == (10.0, 0.0)
+    assert follow_gaps(V3) == (0.0, 2.0) and lead_gaps(V3) == (10.0, 2.0)
+    assert follow_binds(_rec(25.0, 13.0), 0, 1, *follow_gaps(V3))        # 25 m <= 2 s * 13 m/s
+    assert not follow_binds(_rec(27.0, 13.0), 0, 1, *follow_gaps(V3))
+    assert follow_binds(_rec(9.5, 2.0), 0, 1, *lead_gaps(V3))            # slow: the 10 m floor holds
 
 
 if __name__ == "__main__":

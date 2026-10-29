@@ -6,7 +6,9 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from f_toy.datasets.drivetoy.choices import choice_p, driver_values, end_label, style_c50
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
+
+V3 = dict(CFG, **V3_OVERRIDES)
 
 
 def test_choice_p():
@@ -50,6 +52,14 @@ def test_end_label():
     assert end_label([row(34, 0.5, rel=0)]) == "none"      # someone else's choice
     assert end_label([row(45, 0.5)]) == "none"             # too late to count
     assert end_label(np.zeros((0, 7))) == "none"
+
+
+def test_heavy_driver_values():
+    rng = np.random.RandomState(2)
+    heavy = [driver_values(rng, V3, rng.rand(), heavy=True)["v0frac"] for _ in range(2000)]
+    light = [driver_values(rng, V3, rng.rand(), heavy=False)["v0frac"] for _ in range(2000)]
+    assert 0.65 <= min(heavy) and max(heavy) <= 0.85, (min(heavy), max(heavy))
+    assert 0.75 <= min(light) and max(light) <= 0.97, (min(light), max(light))
 
 
 if __name__ == "__main__":

@@ -187,7 +187,7 @@ class Vehicle:
         self.route = list(route)
         self.s, self.v, self.acc = s, v, 0.0
         self.style = float(rng.rand())         # cautious 0 to assertive 1 (choices.py)
-        dv = driver_values(rng, cfg, self.style)
+        dv = driver_values(rng, cfg, self.style, heavy=code >= 3)
         self.T, self.s0, self.b = dv["T"], dv["s0"], dv["b"]
         self.a = dv["a"] * (0.7 if code >= 3 else 1.0)
         self.v0frac, self.a_lat, self.turn_dist = dv["v0frac"], dv["a_lat"], dv["turn_dist"]
@@ -985,7 +985,10 @@ class Sim:
         the last visible frame it pulls out only if it was held up by then."""
         cfg = self.cfg
         lead, gap = self._leader(veh, index)
-        if lead is None or lead.parked or gap > cfg["DT_LEAD_GAP"] + 2.0 or lead.v > 0.65 * self._v0(veh):
+        # v3 (D1): a lead below 0.85 of its desired speed, within 10 m or 2 s, holds it up
+        reach = max(cfg["DT_LEAD_GAP"], cfg["DT_FOLLOW_GAP_S"] * veh.v) if cfg.get("DT_V3") else cfg["DT_LEAD_GAP"]
+        slow = 0.85 if cfg.get("DT_V3") else 0.65
+        if lead is None or lead.parked or gap > reach + 2.0 or lead.v > slow * self._v0(veh):
             veh.behind_since = None
             return
         if veh.behind_since is None:

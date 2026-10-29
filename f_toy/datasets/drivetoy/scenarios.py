@@ -166,6 +166,11 @@ def _add(sim, lane_id, s, v, kind=None):
     return u
 
 
+def _lead_frac(rng, cfg, kind):
+    """v3: a leader's desired speed as a fraction of the limit, from its kind's range."""
+    return _u(rng, *(cfg["DT_V0_FRAC_HEAVY"] if VEH_KINDS[kind][0] >= 3 else cfg["DT_V0_FRAC"]))
+
+
 def _add_ahead(sim, rng, ln, s, gap, v, kind=None, v0frac=None, route=None, cap_line=True):
     """A vehicle on ln whose rear is ``gap`` metres ahead of a front bumper at s + EGO_HALF."""
     kind = kind or ("car" if rng.rand() < 0.6 else ("suv" if rng.rand() < 0.6 else "truck"))
@@ -408,7 +413,15 @@ def _recipe_signal4(sim, rng, tg):
             plan["s"] = _s_for_line(ln, d_line + _u(rng, 6.5, 9.0))
             plan["post"].append(lambda s, e, r, ln=ln: _add_ahead(s, r, ln, e.s, max(ln.stop["s"] - e.front - 1.5 - 4.5, 1.5), v=0.0, kind="car", route=turn))
         else:
-            if C == "follow":   # a slow vehicle close ahead, followed within 7 m
+            if C == "follow" and cfg.get("DT_V3"):   # v3: a leader at its normal speed, 1.0 to 1.8 s ahead
+                kind = ("car", "suv", "truck")[int(rng.choice(3, p=[0.5, 0.3, 0.2]))]
+                f_l = _lead_frac(rng, cfg, kind)
+                v_f = ln.limit * f_l
+                plan["v"], plan["cap"] = v_f * _u(rng, 1.0, 1.05), False
+                plan.setdefault("extra", {})["v0frac"] = min(0.97, f_l + _u(rng, 0.05, 0.12))
+                plan["post"].append(lambda s, e, r, ln=ln, v=v_f, k=kind, f=f_l: _add_ahead(
+                    s, r, ln, e.s, v * _u(r, 1.0, 1.8), v=v, kind=k, v0frac=f, route=turn))
+            elif C == "follow":   # a slow vehicle close ahead, followed within 7 m
                 v_f = _u(rng, 2.5, 4.0)
                 plan["v"], plan["cap"] = v_f * _u(rng, 1.0, 1.1), False
                 plan["post"].append(lambda s, e, r, ln=ln, v=v_f: _add_ahead(s, r, ln, e.s, _u(r, 4.0, 6.0), v=v,
@@ -571,12 +584,19 @@ def _recipe_multilane(sim, rng, tg):
         elif B == "lead vehicle" and (D == "lane change" or V == "overtake"):
             # a slow vehicle the ego follows within 10 m; pulling out from behind it is its choice
             plan["clear_ahead"] = 150.0
-            v_l = 70 / 3.6 * _u(rng, 0.18, 0.26)
+            v3 = sim.cfg.get("DT_V3")
+            v_l = 70 / 3.6 * (_u(rng, *sim.cfg["DT_OVERTAKE_V0_FRAC"]) if v3 else _u(rng, 0.18, 0.26))
             kind = ["truck", "bus", "car"][int(rng.choice(3, p=[0.45, 0.35, 0.2]))]
+            if v3:   # v3 (D1): slower than the ego, above 60% of the limit; the ego closes in to within 2 s
+                ego_frac = _u(rng, *sim.cfg["DT_OVERTAKE_EGO_FRAC"])
             if pend:   # it catches up, slows, and is held up when the clip ends
                 plan["v"], gap0, patience = v0 * _u(rng, 0.85, 1.0), _u(rng, 30.0, 45.0), _u(rng, 1.5, 2.5)
+                if v3:
+                    gap0 = v_l * _u(rng, 1.4, 1.8) + (70 / 3.6 * ego_frac - v_l) * _u(rng, 2.0, 3.5)
             else:      # already behind it for a while, pulls out within the clip
                 plan["v"], gap0, patience = v_l * _u(rng, 1.0, 1.1), _u(rng, 5.5, 7.5), _u(rng, 0.8, 1.5)
+                if v3:
+                    gap0 = v_l * _u(rng, 1.1, 1.6)
             ego_extra = dict(overtaker=True, patience=patience, T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0), lc_quick=not pend)
             if not pend:
                 plan["post"].append(lambda s, e, r: setattr(e, "behind_since", s.t - e.patience - _u(r, 0.0, 0.3)))
@@ -593,14 +613,27 @@ def _recipe_multilane(sim, rng, tg):
             plan["post"].append(traffic)
         elif B == "lead vehicle":   # a slow vehicle close ahead: followed within 10 m
             plan["clear_ahead"] = 120.0
-            v_l = 70 / 3.6 * (_u(rng, 0.13, 0.2) if C == "follow" else _u(rng, 0.18, 0.3))
-            if C == "slow down":
-                plan["v"], gap0 = v0 * _u(rng, 0.8, 1.0), _u(rng, 40.0, 60.0)
+            if sim.cfg.get("DT_V3"):   # v3: a leader at its normal speed (a truck or bus to slow down for)
+                kind = ("truck", "bus")[int(rng.randint(2))] if C == "slow down" else ("car", "truck", "bus")[int(rng.randint(3))]
+                f_l = _lead_frac(rng, sim.cfg, kind)
+                v_l = 70 / 3.6 * f_l
+                if C == "slow down":
+                    plan["v"], gap0 = v0 * _u(rng, 0.95, 1.0), _u(rng, 40.0, 60.0)
+                else:
+                    plan["v"], gap0 = v_l * _u(rng, 1.0, 1.05), v_l * _u(rng, 1.0, 1.8)
+                ego_frac = 0.97 if C == "slow down" else min(0.97, f_l + _u(rng, 0.05, 0.12))
+                ego_extra = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
+                plan["post"].append(lambda s, e, r, ln=ln, v=v_l, g=gap0, k=kind, f=f_l: _add_ahead(
+                    s, r, ln, e.s, g, v=v, v0frac=f, kind=k))
             else:
-                plan["v"], gap0 = v_l * _u(rng, 1.0, 1.15), _u(rng, 5.0, 8.0)
-            ego_extra = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
-            plan["post"].append(lambda s, e, r, ln=ln, v=v_l, g=gap0: _add_ahead(
-                s, r, ln, e.s, g, v=v, v0frac=v / (70 / 3.6), kind=["car", "truck", "bus"][int(r.randint(3))]))
+                v_l = 70 / 3.6 * (_u(rng, 0.13, 0.2) if C == "follow" else _u(rng, 0.18, 0.3))
+                if C == "slow down":
+                    plan["v"], gap0 = v0 * _u(rng, 0.8, 1.0), _u(rng, 40.0, 60.0)
+                else:
+                    plan["v"], gap0 = v_l * _u(rng, 1.0, 1.15), _u(rng, 5.0, 8.0)
+                ego_extra = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
+                plan["post"].append(lambda s, e, r, ln=ln, v=v_l, g=gap0: _add_ahead(
+                    s, r, ln, e.s, g, v=v, v0frac=v / (70 / 3.6), kind=["car", "truck", "bus"][int(r.randint(3))]))
         else:   # none: free driving at the limit on an open stretch
             plan["clear_ahead"] = 300.0
             density = _u(rng, 0.15, 0.35)
@@ -677,7 +710,14 @@ def _recipe_residential(sim, rng, tg):
                 else:
                     _clear(sm, opp.id, s_o - 160.0, s_o + 15.0)
             plan["post"].append(parked)
-        if B == "lead vehicle":   # a slow car close ahead: followed within 10 m
+        if B == "lead vehicle" and sim.cfg.get("DT_V3"):   # v3: a car at its normal speed, 1.0 to 1.8 s ahead
+            f_l = _lead_frac(rng, sim.cfg, "car")
+            v_l = 50 / 3.6 * f_l
+            plan["v"] = v_l * _u(rng, 1.0, 1.05)
+            plan["extra"] = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0), v0frac=min(0.97, f_l + _u(rng, 0.05, 0.12)))
+            plan["post"].append(lambda sm, e, r, v=v_l, f=f_l: _add_ahead(sm, r, ln, e.s, v * _u(r, 1.0, 1.8), v=v,
+                                                                       kind="car", v0frac=f))
+        elif B == "lead vehicle":   # a slow car close ahead: followed within 10 m
             v_l = 50 / 3.6 * (_u(rng, 0.18, 0.28) if C == "follow" else _u(rng, 0.25, 0.4))
             plan["v"] = v_l * _u(rng, 1.0, 1.15)
             plan["extra"] = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
@@ -802,7 +842,7 @@ def simulate(seed, cfg, template=None, target=None):
         labs = [clip_labels(pk, m, cfg) for pk in pks]
         if not all(l["A"] == target["A"] and (l["a_ok"] or pend) and l["D"] is not None for l in labs):
             continue
-        if cfg.get("DT_OVERTAKE_CHECK") and any(l["D"] == "lane change" and overtake_problems(pk, T0 + 1)
+        if cfg.get("DT_OVERTAKE_CHECK") and any(l["D"] == "lane change" and overtake_problems(pk, T0 + 1, cfg)
                                                 for l, pk in zip(labs, pks)):
             continue   # an overtake must start from following its leader within 10 m
         sc = _score(labs[0], target)
