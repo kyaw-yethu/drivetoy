@@ -17,10 +17,11 @@ DriveToy v2 is a procedural driving dataset: a lane-graph traffic simulator (IDM
   - [Labels and checks](#labels-and-checks)
   - [Other changes](#other-changes)
   - [Build](#build)
+- [DriveToy v3](#drivetoy-v3)
 
 ## Data
 
-The splits are in `/root/projects/drive_v2s/` on yethu-workspace.
+The splits are in `drive_v2s_data.zip` in the shared Google Drive folder.
 
 | Split | Clips | Samples | `signal4` | `stop4` | `multilane` | `residential` |
 |---|---:|---:|---:|---:|---:|---:|
@@ -242,3 +243,77 @@ In val, 94.8% of the pending samples show both outcomes of their pending choice 
 ![One pending val clip per kind of choice; the map runs on to frame 40](pending_v2s.gif)
 
 ![Four futures of pending val clips, forked at frame 31](forks_v2s.gif)
+
+# DriveToy v3
+
+DriveToy v3 is built by this code with `DT_V3` on (`V3_OVERRIDES` in `config.py`); [version-3-revision.md](version-3-revision.md) lists the issues it revises and [task_encoder_eval.md](task_encoder_eval.md) the evaluation its new labels serve. Without `DT_V3` the code runs exactly as before, so v2s samples still re-simulate from their seeds.
+
+## Data (v3)
+
+The splits are in `/root/projects/drive_v3/` on yt-workspace and in `drive_v3_data.zip` in the shared Google Drive folder, next to the code in `drivetoy_v3_code.zip`.
+
+| Split | Clips | Samples |
+|---|---:|---:|
+| train | 10,000 | 10,000 |
+| val | 1,500 | 1,500 |
+| test | 1,500 | 3,000 |
+
+Samples keep the v2s format: 32 visible frames at $128 \times 128$ and 5 Hz, then 32 label-only frames, and 16 futures of frames 32 to 63 per sample, forked at frame 31. Each split holds `annotations.npz`, `future_set.npz`, `meta.json`, `checks.json` and the per-sample `labels/`, `scenes/`, `maps/` and `render/` files; val and test also hold `videos.npy`, and train keeps its frames in `render/<n>.npz` only. The GIFs are in `viz/`.
+
+The new labels are in `annotations.npz` and `labels/<n>.npz`, and the per-future ones also in `future_set.npz`.
+
+| Label | Shape | Meaning |
+|---|---|---|
+| `maps/<n>.json.gz` | one file per sample | the map (lane graph, signals, signs, crosswalks, school zone), read with `map_io.load_map`; parked cars standing in a lane are vehicles in `agents`, not part of the map |
+| `may_go` | (64,), futures (16, 32) | 1 if the ego may lawfully go at the stop line of its route in that frame, 0 if not, $-1$ without a junction ahead |
+| `may_go_reason` | (64,), futures (16, 32) | why it may not go, as an index into `meta["may_go_reasons"]`: none, light, oncoming, pedestrian, conflict, stop order |
+| `ego_turn` | (), futures (16,) | the ego's move at the junction: 0 none, 1 left, 2 straight, 3 right |
+| `route_drawn` | () | whether the 16 futures drew their routes (Issue 6) |
+
+## Changes (v3)
+
+| Issue | What v3 does |
+|---|---|
+| 1. Leads | Cars draw a desired speed of at least 60% of the limit, and trucks and buses 65 to 85%. The speed label "follow" needs the leader within a 2 s time gap, and the cause "lead vehicle" within $\max(10\,\text{m},\ 2\,\text{s} \cdot v)$. The ego overtakes a lead slower than 0.85 of its own desired speed once it is that close. |
+| 2. Go choices | A "go" drawn at the stop line is carried out unless a vehicle enters the conflict area or can no longer stop before it at $3\,\text{m/s}^2$; a committed left turn also gives up while an oncoming car is under 2.8 s away. A car given its turn at a four-way stop keeps it. Stops last 0.8 s and start delays 0.2 to 0.6 s. |
+| 3. Oncoming gaps | Cars on the lanes a left-turner yields to keep time headways of at least 2 s (mean 4 to 8 s per scene), and arrival times allow for acceleration. |
+| 4. Left-only lane | About 35% of the traffic at four-way junctions uses the left-only lane, half the signal maps have 6 to 8 s protected left arrows, and the solid line covers only the last 30 m before the junction. |
+| 5. Trees | Trees whose crown would hide a stop sign or signal head from the approach are left out. |
+| 6. Routes | When the ego has not signalled by frame 31 and its lane allows several moves, each future draws its move with equal odds. |
+| 7. Labels | `maps`, `may_go`, `may_go_reason`, `ego_turn` and `route_drawn`, above. |
+| 8. School zone | One red surface covers both lanes over the whole zone, and a blue triangle (2.0 m wide, 4 m long) marks its start. |
+
+## Checks (v3)
+
+`scripts/v3_checks.py <split> [--resim]` runs the v2s checks and adds a `v3` section per issue to `<split>/checks.json`.
+
+| Check | Train | Val | Test |
+|---|---:|---:|---:|
+| Pending samples (aspect E) | 20.1% | 20.3% | 19.0% |
+| Pending samples with both outcomes in their 16 futures | 94.6% | 94.1% | 95.8% |
+| Vehicles outside their speed range | 0 | 0 | 0 |
+| Committed left turns carried out | 626 / 626 | 96 / 96 | 180 / 180 |
+| Committed right turns on red carried out | 477 / 479 | 81 / 81 | 143 / 143 |
+| Stop-sign ties resolved in arrival order | 254 / 259 | 42 / 42 | 88 / 88 |
+| Standing time at a clear stop sign, mean (max) | 1.3 s (1.6 s) | 1.3 s (1.6 s) | 1.3 s (1.6 s) |
+| Shortest oncoming gap (share under 3 s) | 2.6 s (0.3%) | 2.8 s (0.4%) | 2.8 s (0.8%) |
+| Ego finishes its left turn after yielding | 751 / 926 | 112 / 134 | 233 / 276 |
+| Left-only lane share | 37.7% | 37.4% | 38.0% |
+| Trees left out per clip | 4.7 | 4.7 | 4.7 |
+| Samples whose futures draw routes | 2,297 | 365 | 728 |
+| Future moves right / straight / left | 44.3 / 44.2 / 11.5% | 44.7 / 43.9 / 11.5% | 43.9 / 44.5 / 11.6% |
+| Indicator before frame 32 in those samples | 0 | 0 | 0 |
+
+All 1,500 val samples re-simulate exactly and `rules.check` reports 0 violations; the builder rejects any candidate whose record breaks a rule, so train and test hold none either. The logged ego stands at its stop line while `may_go` is 1 in 43 train, 10 val and 18 test samples; the examples in `checks.json` last 1 to 4 frames (0.2 to 0.8 s), so the "didn't go" rule should allow about 1 s before it counts.
+
+![One pending val clip per kind of choice](pending_v3.gif)
+
+![Four futures of pending val clips, forked at frame 31](forks_v3.gif)
+
+One val clip per label of each aspect: [A](diversity_A_light_v3.gif), [B](diversity_B_cause_v3.gif), [C](diversity_C_speed_v3.gif), [D](diversity_D_path_v3.gif), [E](diversity_E_choice_v3.gif).
+
+## Scripts and tests (v3)
+
+- `scripts/build_drivetoy_v3.py --split <train|val|test> --gpus 0,1,2,3` builds a split into `/root/projects/drive_v3/<split>` and resumes where it stopped; `drive_v3/run_all.sh` builds all three, then runs the checks and writes the GIFs.
+- `scripts/v2s_viz.py <split> --out <dir> --suffix v3` writes the GIFs, and `scripts/v2s_zip.py <folder> <zip>` the archives.
+- The tests run as plain scripts (`python3 tests/test_v3_leads.py`); `tests/test_v3_regression.py` needs `drive_v2s/val` from `drive_v2s_data.zip` and skips without it.
