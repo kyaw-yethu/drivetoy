@@ -1,6 +1,6 @@
 # DriveToy v3
 
-DriveToy v3 is a procedural driving dataset: a lane-graph traffic simulator (IDM car following, MOBIL lane changes, signals, stop signs, pedestrians) rendered with Blender Cycles from the ego car's front camera. It is built by the code in this repository with `DT_V3` on (`V3_OVERRIDES` in `config.py`). [version-3-revision.md](version-3-revision.md) lists the issues this version addresses, and [task_encoder_eval.md](task_encoder_eval.md) describes the evaluation its labels serve.
+DriveToy v3 is a procedural driving dataset: a lane-graph traffic simulator (IDM car following, MOBIL lane changes, signals, stop signs, pedestrians) rendered with Blender Cycles from the ego car's front camera. It is built by the code in this repository. [version-3-revision.md](docs/version-3-revision.md) lists the issues this version addresses, and [task_encoder_eval.md](docs/task_encoder_eval.md) describes the evaluation its labels serve.
 
 **Contents**
 
@@ -261,9 +261,9 @@ The "didn't go" rule counts once the ego has stood for 1 s while `may_go` is 1 (
 
 - `scripts/run_all.sh [out_dir]`: the full build into `out_dir` (default `/root/projects/drive_v3`), with status lines in `<out_dir>/logs/status.log`.
 - `scripts/build_drivetoy_v3.py --split <train|val|test> --gpus 0,1,2,3`: builds a split into `/root/projects/drive_v3/<split>` (simulation, then rendering) and resumes where it stopped.
-- `scripts/v3_checks.py <split> [--resim]`: the checks above, written to `<split>/checks.json`.
-- `scripts/v2s_viz.py <split> --out <dir> --suffix v3`: `diversity_<aspect>_v3.gif` (A to E, one clip per label), `pending_v3.gif` (one pending clip per kind of choice) and `forks_v3.gif` (four futures of a pending clip, forked at frame 31).
-- `scripts/v2s_zip.py <folder> <zip>`: the data and code archives.
+- `scripts/v3_checks.py <split> [--resim]`: the checks above (with `scripts/base_checks.py`), written to `<split>/checks.json`.
+- `scripts/make_gifs.py <split> --out <dir>`: `diversity_<aspect>_v3.gif` (A to E, one clip per label), `pending_v3.gif` (one pending clip per kind of choice) and `forks_v3.gif` (four futures of a pending clip, forked at frame 31).
+- `scripts/zip_folder.py <folder> <zip>`: the data and code archives.
 - The tests run as plain scripts (`python3 tests/test_v3_leads.py`).
 
 The simulator, rule checker, labels and Blender renderer are in `f_toy/datasets/drivetoy/`; Blender 4.2 renders on CUDA GPUs.

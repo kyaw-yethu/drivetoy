@@ -8,11 +8,11 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from f_toy.datasets.drivetoy.choices import cautious_gap
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
 from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
 from f_toy.datasets.drivetoy.sim import BALL_R, EV, MAY_GO_REASONS, RS
 
-V3 = dict(CFG, **V3_OVERRIDES, DT_FORKS=4, DT_KEEP_FORK_RECS=True)
+V3 = dict(CFG, DT_FORKS=4, DT_KEEP_FORK_RECS=True)
 LIGHT = MAY_GO_REASONS.index("light")
 
 

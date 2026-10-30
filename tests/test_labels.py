@@ -5,10 +5,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
-from f_toy.datasets.drivetoy.diversity import CUTIN_GAP_S, FOLLOW_GAP, LEAD_GAP, follow_binds, follow_gaps, lead_gaps
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from f_toy.datasets.drivetoy.diversity import CUTIN_GAP_S, LEAD_GAP, follow_binds, follow_gaps, lead_gaps
 
-V3 = dict(CFG, **V3_OVERRIDES)
+V3 = dict(CFG)
 
 
 def _rec(gap, v):
@@ -20,20 +20,17 @@ def _rec(gap, v):
 
 
 def test_thresholds():
-    assert (FOLLOW_GAP, LEAD_GAP, CUTIN_GAP_S) == (7.0, 10.0, 2.0)
+    assert (LEAD_GAP, CUTIN_GAP_S) == (10.0, 2.0)
 
 
 def test_follow_binds():
-    assert follow_binds(_rec(6.9, 15.0), 0, 1, FOLLOW_GAP)
-    assert not follow_binds(_rec(7.1, 15.0), 0, 1, FOLLOW_GAP)        # flat: speed does not stretch it
     assert follow_binds(_rec(9.9, 3.0), 0, 1, LEAD_GAP)
     assert not follow_binds(_rec(10.5, 3.0), 0, 1, LEAD_GAP)
     assert follow_binds(_rec(25.0, 13.0), 0, 1, LEAD_GAP, CUTIN_GAP_S)  # a cut-in binds within 2 s
     assert not follow_binds(_rec(5.0, 13.0), 0, 0, LEAD_GAP)            # no leader
 
 
-def test_v3_follow_time_gap():
-    assert follow_gaps(CFG) == (7.0, 0.0) and lead_gaps(CFG) == (10.0, 0.0)
+def test_follow_time_gap():
     assert follow_gaps(V3) == (0.0, 2.0) and lead_gaps(V3) == (10.0, 2.0)
     assert follow_binds(_rec(25.0, 13.0), 0, 1, *follow_gaps(V3))        # 25 m <= 2 s * 13 m/s
     assert not follow_binds(_rec(27.0, 13.0), 0, 1, *follow_gaps(V3))

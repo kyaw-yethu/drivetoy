@@ -28,7 +28,7 @@ import bpy
 import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from geom import crown_blocks   # noqa: E402  (v3: no tree crowns in the sightlines)
+from geom import crown_blocks   # noqa: E402  (no tree crowns in the sightlines)
 
 CAR_COLORS = [(0.55, 0.05, 0.04), (0.02, 0.12, 0.40), (0.85, 0.85, 0.85), (0.05, 0.05, 0.05), (0.45, 0.45, 0.47),
               (0.10, 0.28, 0.12), (0.75, 0.55, 0.08), (0.20, 0.35, 0.55), (0.60, 0.60, 0.62), (0.30, 0.08, 0.20),
@@ -301,7 +301,7 @@ def build_static(sc, rng):
             G(0).add(g_strip(pts, 0.15, z), white)
         elif st == "stop_line":
             G(0).add(g_strip(pts, 0.45, z), white)
-        elif st == "school_triangle":   # v3 (Issue 8): filled blue, on the red zone pavement
+        elif st == "school_triangle":   # filled blue, on the red zone pavement
             G(0).add(g_poly(pts, z), mat("school_tri", (0.04, 0.16, 0.7), rough=0.5))
         elif st == "double_yellow":
             d = pts[-1] - pts[0]
@@ -414,7 +414,7 @@ def _trees(geo, sc, rng):
             h = rng.uniform(3.5, 6.0)
             r = rng.uniform(1.2, 2.0)
             leaf = leaves[rng.randint(3)]
-            if crown_blocks((q[0], q[1], h * 0.72), r, sight, margin=0.6):   # v3: drawn but left out; 0.6 m covers a sign face
+            if crown_blocks((q[0], q[1], h * 0.72), r, sight, margin=0.6):   # drawn but left out; 0.6 m covers a sign face
                 skipped += 1
                 continue
             geo.add(g_cyl(q[0], q[1], 0.15, h * 0.6, 0.15), trunk)
@@ -464,7 +464,7 @@ def build_heads(sc, geos):
     housing = mat("housing", (0.03, 0.03, 0.03), rough=0.5)
     pole = mat("pole", (0.5, 0.5, 0.52), metal=0.6, rough=0.4)
     cols = dict(red=(1.0, 0.05, 0.02), yellow=(1.0, 0.55, 0.0), green=(0.1, 1.0, 0.3), arrow=(0.1, 1.0, 0.3))
-    cols.update({k: tuple(v) for k, v in sc.get("signal_colors", {}).items()})   # v2: per-build lamp colours
+    cols.update({k: tuple(v) for k, v in sc.get("signal_colors", {}).items()})   # per-build lamp colours
     heads = []
     for i, h in enumerate(sc["heads"]):
         x, y, z = h["pos"]

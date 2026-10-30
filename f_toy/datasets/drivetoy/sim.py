@@ -29,7 +29,7 @@ TYPE_NAMES = ["none", "car", "suv", "truck", "bus", "ped_adult", "ped_child"]
 RULE_STATES = ["GO", "FOLLOW", "STOP_SIGNAL", "STOP_SIGN", "YIELD_ONCOMING", "YIELD_PED",
                "YIELD_CONFLICT", "MERGE", "SLOW", "PED_WALK", "PED_WAIT"]
 RS = {n: i for i, n in enumerate(RULE_STATES)}
-# v3 (Issue 7): why an ego stopped at its line could not enter now (index 0: it could, or no line)
+# why an ego stopped at its line could not enter now (index 0: it could, or no line)
 MAY_GO_REASONS = ["", "light", "oncoming", "pedestrian", "conflict", "stop_order"]
 
 EVENTS = ["SIGNAL", "TURN_ON", "LC_START", "STOP", "GO", "YIELD", "ENTER", "PED_DECIDE", "PED_CROSS",
@@ -79,8 +79,8 @@ class Signals:
         g, ph = self.seq[self.i]
         self.walk = None
         self.arrow_dur = None
-        self.queue = []       # v2: planned [(phase, duration)] of the phases to come
-        self.frozen = None    # v2: time at which the controller is held (cued signal timing)
+        self.queue = []       # planned [(phase, duration)] of the phases to come
+        self.frozen = None    # time at which the controller is held (cued signal timing)
         if ph == "G":
             self.start = t0 - rng.uniform(0, cfg["SIG_GREEN_WALK"][0])
         elif ph == "A":
@@ -98,7 +98,7 @@ class Signals:
             self.arrow_dur = elapsed + _u(rng, (0.5, 2.0))
 
     def schedule(self, group, phase, t_start, t0, dur):
-        """v2: make (group, phase) start at time t_start. The cycle is walked back to the
+        """Make (group, phase) start at time t_start. The cycle is walked back to the
         warm-up start t0; dur(phase) gives the length of every planned phase (a green's
         includes its flashing don't-walk). The target phase is planned too."""
         j = self.seq.index((group, phase))
@@ -198,9 +198,9 @@ class Vehicle:
         self.patience = biased(rng, cfg["DT_PATIENCE"], self.style, cfg["DT_STYLE_CORR"], up=False)
         self.choices = {}          # kind -> (key, outcome) of its latest major choice
         self.go_at = None          # start-up delay: when a stopped vehicle may move off
-        self.commit = None         # v3: the "go" choice it committed to (left_gap, rtor, stop_wave)
-        self.route_pending = False # v3: the ego's move is drawn per future at the fork (Issue 6)
-        self.late_route = False    # v3: its move was drawn at the fork; the indicator follows turn_dist only
+        self.commit = None         # the "go" choice it committed to (left_gap, rtor, stop_wave)
+        self.route_pending = False # the ego's move is drawn per future at the fork (Issue 6)
+        self.late_route = False    # its move was drawn at the fork; the indicator follows turn_dist only
         self.rtor_stop, self.rtor_ready, self.rtor_on = 0.0, False, False   # right turn on red
         self.behind_since = None   # overtaker: since when it is held up behind a slow leader
         self.ind_pending = False   # turn decided, indicator not on yet (it comes on at turn_dist)
@@ -228,8 +228,8 @@ class Vehicle:
         self.yield_to = -1
         self.alive = True
         self.stopped = v < 0.3
-        self.parked = False        # v2: double-parked, hazard lamps on, never moves
-        self.nudge = None          # v2: planned sideways detour around a parked vehicle
+        self.parked = False        # double-parked, hazard lamps on, never moves
+        self.nudge = None          # planned sideways detour around a parked vehicle
         self.dslope = 0.0
 
     def set_route(self, m, route):
@@ -357,9 +357,9 @@ class Sim:
         self.ego_ran_out = False
         self.inflow = {}
         self.ped_inflow = 0.0
-        self.gap_lanes = {}        # v3: lane id -> mean of its exponential headway tail (Issue 3)
-        self.stream_mu = {}        # v3: the same for lanes fed by a recipe's stream only
-        self.next_arrival = {}     # v3: next spawn time on a gap lane
+        self.gap_lanes = {}        # lane id -> mean of its exponential headway tail (Issue 3)
+        self.stream_mu = {}        # the same for lanes fed by a recipe's stream only
+        self.next_arrival = {}     # next spawn time on a gap lane
         self.violation = cfg.get("DT_VIOLATION")
         self.viol_from = cfg["DT_BRANCH_FRAME"] + 1
         self.decisions = []        # [frame, slot, kind, cue, p, outcome, ego_rel] (choices.DEC_COLS)
@@ -458,7 +458,7 @@ class Sim:
         return veh
 
     def add_parked(self, lane_id, s, d, kind=None):
-        """v2: a double-parked vehicle at arclength s of a lane, d metres left of its centre."""
+        """A double-parked vehicle at arclength s of a lane, d metres left of its centre."""
         veh = self.add_vehicle(lane_id, s, v=0.0, kind=kind)
         if veh is not None:
             veh.parked, veh.hazard, veh.d, veh.stopped = True, True, float(d), True
@@ -480,8 +480,8 @@ class Sim:
         for lid in self.m.spawn_lanes:
             ln = self.m.lanes[lid]
             end = ln.length - (8.0 if ln.stop else 3.0)
-            if self.cfg.get("DT_V3") and lid not in self.gap_lanes:
-                # v3: the first car within one usual gap of the lane start, so a sparse lane keeps its share
+            if lid not in self.gap_lanes:
+                # the first car within one usual gap of the lane start, so a sparse lane keeps its share
                 s = 5.0 + rng.rand() * rng.uniform(12, 70) / max(density, 0.15) / ln.inflow_w
             else:
                 s = rng.uniform(5, 30)
@@ -498,7 +498,7 @@ class Sim:
                         veh.v = min(veh.v, np.sqrt(2 * 2.0 * d))
                     if lid in self.gap_lanes:
                         veh.T = max(veh.T, self.cfg["DT_ONCOMING_MIN"])
-                if lid in self.gap_lanes:     # v3: spaced by the oncoming headway law
+                if lid in self.gap_lanes:     # spaced by the oncoming headway law
                     s += ln.limit * 0.85 * self.headway(lid)
                 else:
                     s += rng.uniform(12, 70) / max(density, 0.15) / ln.inflow_w
@@ -515,7 +515,7 @@ class Sim:
                 self.add_ped(path, s=rng.uniform(0, _pathlen(path["approach"])))
 
     def set_ego_route(self, turn):
-        """v3 (Issue 6): give the ego, still before its line, the move ``turn`` drawn for this future."""
+        """Give the ego, still before its line, the move ``turn`` drawn for this future."""
         veh = self.ego
         i, _ = veh.where()
         ln = veh.lanes[i]
@@ -526,7 +526,7 @@ class Sim:
         veh.ind_pending = c.turn in ("L", "R")
 
     def headway(self, lane_id):
-        """v3 (Issue 3): an oncoming headway, DT_ONCOMING_MIN plus an exponential tail whose mean is
+        """An oncoming headway, DT_ONCOMING_MIN plus an exponential tail whose mean is
         the lane's (``gap_lanes``) or one drawn once for the lane from DT_ONCOMING_MEAN."""
         mu = self.gap_lanes.get(lane_id)
         if mu is None:
@@ -563,7 +563,7 @@ class Sim:
             if start > 80.0:
                 break
         if veh.route_pending and veh.lanes[i].kind == "in":
-            # v3 (D4): an ego whose move is still open slows for the tightest move its lane allows
+            # an ego whose move is still open slows for the tightest move its lane allows
             ln_i = veh.lanes[i]
             base = -sl - veh.L / 2 + ln_i.length
             for c in (self.m.lanes[x] for x in ln_i.next):
@@ -699,7 +699,7 @@ class Sim:
             d_line = veh.off[i] + ln.stop["s"] - veh.front
             if not veh.route_open:
                 ok, why, other = self._may_enter(veh, ln, d_line, index, ped_entering, ped_block)
-                if veh.route_pending and veh.granted:   # v3: let through before the fork, its move is final
+                if veh.route_pending and veh.granted:   # let through before the fork, its move is final
                     veh.route_pending = False
                     veh.ind_pending = veh.turn in ("L", "R")
                 if not ok:
@@ -738,8 +738,8 @@ class Sim:
                         zb0, zb1 = self.m.conflicts[(b, a)]
                         # priority to whoever entered the junction first, until it has cleared the zone
                         if us - u.L / 2 <= zb1 + 0.5 and u.enter_time is not None \
-                                and (u.enter_time < veh.enter_time or (cfg.get("DT_V3") and u.enter_time == veh.enter_time
-                                                                       and veh.turn == "L" and u.turn != "L")) and \
+                                and (u.enter_time < veh.enter_time or (u.enter_time == veh.enter_time
+                                                  and veh.turn == "L" and u.turn != "L")) and \
                                 veh.v ** 2 / (2 * max(d_z - 0.5, 0.05)) <= cfg["DT_B_MAX"]:
                             cands.append((self._idm_stop(veh, v0, d_z - 1.0), RS["YIELD_CONFLICT"], u.slot))
         # ---- lane drop: stop before the end if the merge has not happened ----
@@ -761,7 +761,7 @@ class Sim:
         return self._idm(veh, v0, gap, 0.0)
 
     def _plan_nudge(self, veh, p, gap):
-        """v2: a short detour around the double-parked ``p`` ahead, back into the same lane.
+        """A short detour around the double-parked ``p`` ahead, back into the same lane.
         Where it crosses the centre line it waits for a gap in the oncoming traffic."""
         req = p.d + (p.W + veh.W) / 2 + 0.45          # left offset that clears it by 0.45 m
         if req <= 0.0 or req > 2.4 or gap > 40.0:
@@ -863,8 +863,8 @@ class Sim:
             first = self._stop_order_first() if veh.arrival is not None else None
             if veh.arrival is None or first is not veh:
                 if not self._viol("no_stop"):
-                    if first is None and cfg.get("DT_V2"):
-                        # v2: still arriving: name the vehicle on another approach that already
+                    if first is None:
+                        # still arriving: name the vehicle on another approach that already
                         # waits with precedence, so yielding to crossing traffic is recorded
                         leg = ln.leg
                         w = [u for u in self.vehicles if u.arrival is not None and not u.entered
@@ -875,7 +875,7 @@ class Sim:
             for s0, s1, cw in conn.crosswalks:
                 if cw in ped_entering:
                     return False, RS["YIELD_PED"], ped_entering[cw]
-        if veh.route_pending:   # v3 (D4): it enters only if every move its lane allows could go now
+        if veh.route_pending:   # it enters only if every move its lane allows could go now
             for c in (self.m.lanes[x] for x in ln.next):
                 for s0, s1, cw in c.crosswalks:
                     p = (ped_block or {}).get(cw, ped_entering.get(cw))
@@ -885,7 +885,7 @@ class Sim:
                     gap, who, inside = self._oncoming_gap(ln, c)
                     if inside is not None or (who is not None and gap < self.cfg["DT_GAP_FLOOR"]):
                         return False, RS["YIELD_ONCOMING"], (inside or who).slot
-        if self.cfg.get("DT_V3") and veh.commit in ("left_gap", "rtor"):
+        if veh.commit in ("left_gap", "rtor"):
             occ = self._conflict_occupied(veh, conn)
             if occ >= 0:
                 self._cancel(veh, occ)
@@ -935,10 +935,7 @@ class Sim:
                 continue
             z = self.m.conflicts.get((uconn.id, conn.id)) if uconn is not None else None
             dist = (ul.stop["s"] - (usl + u.L / 2)) + (z[0] if z is not None else 6.0)
-            if self.cfg.get("DT_V3"):   # v3: a car pulling away is expected to speed up
-                tta = _time_to_cover(dist, u.v, u.a, max(ul.limit * u.v0f(), u.v))
-            else:
-                tta = dist / max(u.v, 1.0)
+            tta = _time_to_cover(dist, u.v, u.a, max(ul.limit * u.v0f(), u.v))   # a car pulling away speeds up
             if tta < min(best, 12.0):
                 best, who = tta, u
         return best, who, None
@@ -947,7 +944,7 @@ class Sim:
         """R3: oncoming through or right traffic. Nobody inside the conflict and nobody within
         DT_GAP_FLOOR s of it; then taking the gap is a choice whose odds rise with the nearest
         oncoming vehicle's time to the conflict (one choice per gap, keyed by that vehicle)."""
-        if self.cfg.get("DT_V3") and veh.commit == "left_gap":
+        if veh.commit == "left_gap":
             occ = self._conflict_occupied(veh, conn)
             if occ < 0:   # ... or an oncoming car arrives within R3's check while the turner is short of its line
                 tau, who, inside = self._oncoming_gap(ln, conn)
@@ -962,25 +959,24 @@ class Sim:
             return False, inside.slot
         if who is None:
             return True, -1
-        if self.cfg.get("DT_V3"):
-            # v3: the gap is judged at the line, as the time the oncoming car still needs once the
-            # turner gets there, so a committed turner crosses its line with that gap left (R3)
-            i = veh.route.index(ln.id)
-            d = max(veh.off[i] + ln.stop["s"] - veh.front, 0.0)
-            t_reach = d / veh.v if veh.v >= 1.0 else \
-                float(np.mean(self.cfg["DT_START_DELAY"])) + float(np.sqrt(2 * d / max(veh.a, 0.5)))
-            best -= t_reach
-            if best >= self.cfg["DT_GAP_FLOOR"] and d > 3.5:
-                return True, -1   # still approaching: the choice is made at the line
+        # the gap is judged at the line, as the time the oncoming car still needs once the
+        # turner gets there, so a committed turner crosses its line with that gap left (R3)
+        i = veh.route.index(ln.id)
+        d = max(veh.off[i] + ln.stop["s"] - veh.front, 0.0)
+        t_reach = d / veh.v if veh.v >= 1.0 else \
+            float(np.mean(self.cfg["DT_START_DELAY"])) + float(np.sqrt(2 * d / max(veh.a, 0.5)))
+        best -= t_reach
+        if best >= self.cfg["DT_GAP_FLOOR"] and d > 3.5:
+            return True, -1   # still approaching: the choice is made at the line
         if best < self.cfg["DT_GAP_FLOOR"]:
             return False, who.slot
         go = self.decide(veh, "left_gap", best, key=who.slot, other=who)
-        if go and self.cfg.get("DT_V3"):
+        if go:
             veh.commit = "left_gap"
         return go, who.slot
 
     def _conflict_occupied(self, veh, conn):
-        """v3: the gap has truly closed: slot of a vehicle whose body lies inside a conflict area of
+        """The gap has truly closed: slot of a vehicle whose body lies inside a conflict area of
         ``conn``, or that can no longer stop before it at R1_STOP_DECEL; -1 if there is none. This
         is the one thing that cancels a committed go."""
         for u in self.vehicles:
@@ -1003,7 +999,7 @@ class Sim:
         return -1
 
     def _cancel(self, veh, other):
-        """v3: drop a committed go (the gap has closed); the next gap is a new choice."""
+        """Drop a committed go (the gap has closed); the next gap is a new choice."""
         veh.choices.pop(veh.commit, None)
         veh.commit = None
         self._event("CANCEL", veh.slot, other)
@@ -1036,7 +1032,7 @@ class Sim:
         traffic within DT_GAP_FLOOR s of the conflict, going is a choice whose odds rise with the gap."""
         if not self.cfg.get("DT_RTOR") or conn.turn != "R":
             return False
-        if self.cfg.get("DT_V3") and veh.commit == "rtor":
+        if veh.commit == "rtor":
             occ = self._conflict_occupied(veh, conn)
             if occ < 0:
                 return True
@@ -1054,7 +1050,7 @@ class Sim:
             veh.rtor_on = True
         else:
             veh.rtor_on = self.decide(veh, "rtor", tta, key=who.slot, other=who)
-            if veh.rtor_on and self.cfg.get("DT_V3"):
+            if veh.rtor_on:
                 veh.commit = "rtor"
         return veh.rtor_on
 
@@ -1128,10 +1124,9 @@ class Sim:
         the last visible frame it pulls out only if it was held up by then."""
         cfg = self.cfg
         lead, gap = self._leader(veh, index)
-        # v3 (D1): a lead below 0.85 of its desired speed, within 10 m or 2 s, holds it up
-        reach = max(cfg["DT_LEAD_GAP"], cfg["DT_FOLLOW_GAP_S"] * veh.v) if cfg.get("DT_V3") else cfg["DT_LEAD_GAP"]
-        slow = 0.85 if cfg.get("DT_V3") else 0.65
-        if lead is None or lead.parked or gap > reach + 2.0 or lead.v > slow * self._v0(veh):
+        # a lead below 0.85 of its desired speed, within 10 m or 2 s, holds it up
+        reach = max(cfg["DT_LEAD_GAP"], cfg["DT_FOLLOW_GAP_S"] * veh.v)
+        if lead is None or lead.parked or gap > reach + 2.0 or lead.v > 0.85 * self._v0(veh):
             veh.behind_since = None
             return
         if veh.behind_since is None:
@@ -1199,13 +1194,13 @@ class Sim:
         """The vehicle whose turn it is at the all-way stop. It may wave through a car that came
         to its full stop at most DT_WAVE_WINDOW s later on another approach: going in turn is a
         choice whose odds rise with how much later that car arrived (a WAVE event otherwise)."""
-        if self.cfg.get("DT_V3"):   # a car already let through, then one that chose to go in turn, keeps its turn
-            for u in self.vehicles:
-                if u.arrival is not None and u.granted and not u.entered:
-                    return u
-            for u in self.vehicles:
-                if u.commit == "stop_wave" and not u.entered:
-                    return u
+        # a car already let through, then one that chose to go in turn, keeps its turn
+        for u in self.vehicles:
+            if u.arrival is not None and u.granted and not u.entered:
+                return u
+        for u in self.vehicles:
+            if u.commit == "stop_wave" and not u.entered:
+                return u
         first = self._stop_order()
         if first is None or first.arrival is None:
             return first
@@ -1216,8 +1211,7 @@ class Sim:
             return first
         other = min(near, key=lambda u: (u.arrival, u.slot))
         if self.decide(first, "stop_wave", max(other.arrival - first.arrival, 0.0), key=other.slot, other=other):
-            if self.cfg.get("DT_V3"):
-                first.commit = "stop_wave"
+            first.commit = "stop_wave"
             return first
         if getattr(first, "waved", None) != other.slot:
             first.waved = other.slot
@@ -1588,7 +1582,7 @@ class Sim:
         delay = _u(rng, cfg["PED_DELAY"])
         if forced is not None:
             cross = forced
-        elif cfg.get("DT_V2") and self.frame >= cfg["DT_CUE_FRAME"] and self._ego_will_pass(p.cw) and not p.cued:
+        elif self.frame >= cfg["DT_CUE_FRAME"] and self._ego_will_pass(p.cw) and not p.cued:
             cross = False
         else:
             cross = self.decide(p, "ped_cross", cue)
@@ -1737,11 +1731,11 @@ class Sim:
         self.t += dt
 
     def _cue_signals(self):
-        """v2 cued timing: from DT_CUE_FRAME on, the ego's own light may change only out of a
+        """Cued timing: from DT_CUE_FRAME on, the ego's own light may change only out of a
         yellow it showed by then (yellow to red). Otherwise the controller holds its state until
         the ego has crossed its stop line, and runs on from there."""
         sig, ego, cfg = self.signals, self.ego, self.cfg
-        if not cfg.get("DT_V2") or ego is None or self.frame < cfg["DT_CUE_FRAME"]:
+        if ego is None or self.frame < cfg["DT_CUE_FRAME"]:
             return
         app = ego.lanes[0]
         governed = app.kind == "in" and app.stop is not None and app.stop["control"] == "signal" and not ego.entered
@@ -1755,7 +1749,7 @@ class Sim:
     def _spawn(self):
         rng = self.rng
         for lid, rate in self.inflow.items():
-            renewal = lid in self.gap_lanes   # v3: arrivals with the oncoming headway law
+            renewal = lid in self.gap_lanes   # arrivals with the oncoming headway law
             if renewal:
                 if self.t < self.next_arrival.setdefault(lid, self.t + self.headway(lid)):
                     continue
@@ -1814,11 +1808,10 @@ class Sim:
                 lc_moving[u.slot] = 1 if u.lc["side"] == "left" else 2
         self.frames.append(dict(agents=ag, lamps=lamps, extra=extra, signals=sig, lc=lc_moving,
                                 ego=np.array([ep[0], ep[1], eh, ego.v], np.float32)))
-        if self.cfg.get("DT_V3"):
-            self.frames[-1]["may_go"] = np.array(self.may_go_probe(), np.int8)
+        self.frames[-1]["may_go"] = np.array(self.may_go_probe(), np.int8)
 
     def may_go_probe(self):
-        """v3 (Issue 7, D3): whether an ego stopped at its stop line on its own route could enter
+        """Whether an ego stopped at its stop line on its own route could enter
         now: (1, 0), (0, index into MAY_GO_REASONS), or (-1, 0) when it has no stop line ahead or has
         entered. An open route needs every move its lane allows. Reads state only; draws nothing."""
         ego = self.ego
@@ -1888,7 +1881,7 @@ class Sim:
 
 
 def _time_to_cover(d, v, a, vmax):
-    """v3: time to cover d metres from speed v, accelerating at a up to vmax."""
+    """Time to cover d metres from speed v, accelerating at a up to vmax."""
     if d <= 0.0:
         return 0.0
     a = max(a, 0.1)

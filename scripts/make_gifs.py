@@ -2,13 +2,13 @@
 """GIFs of a stochastic build, each tile the ego view beside the top-down map of the same frame
 (heading up, ego in white), from a re-simulation of the clip with its stored sim_seed and target:
 
-- diversity_<aspect>_v2s.gif, aspects A to E: one clip per label;
-- pending_v2s.gif: one pending clip per kind of choice, running on to frame 40 on the map
+- diversity_<aspect>_v3.gif, aspects A to E: one clip per label;
+- pending_v3.gif: one pending clip per kind of choice, running on to frame 40 on the map
   (the ego view holds frame 31) to show the choice being made;
-- forks_v2s.gif: pending clips with four of their futures forked at frame 31, side by side,
+- forks_v3.gif: pending clips with four of their futures forked at frame 31, side by side,
   frames 0 to 63: identical up to frame 31, apart after it.
 
-    python scripts/v2s_viz.py /root/projects/drive_v2s/val --out /root/projects/drive_v2s/viz
+    python scripts/make_gifs.py /root/projects/drive_v3/val --out /root/projects/drive_v3/viz
 """
 import argparse
 import json
@@ -119,8 +119,8 @@ def main():
     ap.add_argument("root")
     ap.add_argument("--out", required=True)
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--forks", type=int, default=4, help="pending clips in forks_v2s.gif")
-    ap.add_argument("--suffix", default="v2s", help="file name suffix, e.g. v3")
+    ap.add_argument("--forks", type=int, default=4, help="pending clips in the forks GIF")
+    ap.add_argument("--suffix", default="v3", help="file name suffix")
     args = ap.parse_args()
     ROOT, out = Path(args.root), Path(args.out)
     out.mkdir(parents=True, exist_ok=True)

@@ -1,6 +1,6 @@
-"""Scene sampling and branched simulation (docs/DRIVETOY.md §4–§5, DATASETv2_plan.md).
+"""Scene sampling and branched simulation (docs/DRIVETOY.md §4–§5).
 
-``simulate(seed, cfg, target=...)`` (v2) builds a scene for a target combination of the four
+``simulate(seed, cfg, target=...)`` builds a scene for a target combination of the four
 diversity labels (``diversity.py``): a recipe picks the template, places the ego so that its
 episode falls in frames 5 to 31, schedules the signal and adds the agents the cause needs. The
 ego's route (and so its indicator) is decided before frame 0. Every attempt runs one shared past
@@ -9,8 +9,6 @@ labelled. An attempt counts only if every branch has the target light label (A) 
 carrying out its response; among those the one matching most of B, then C, then D wins. The
 winner is run to the end of the label-only frames and must keep the ego on the map and pass
 ``diversity.cue_problems``.
-
-``simulate(seed, cfg)`` without a target is the v1 sampler.
 """
 import copy
 
@@ -20,9 +18,7 @@ from .diversity import clip_labels, cue_problems, overtake_problems
 from .rules import check as rules_check
 from .roads import build_map
 from .choices import DEC_COLS, DRIVER_COLS, end_label
-from .sim import EV, P_CROSS, P_WAIT, RS, Sim, VEH_KINDS
-
-DECISION_EVENTS = {EV[n] for n in ("SIGNAL", "TURN_ON", "LC_START", "STOP", "GO", "YIELD", "PED_DECIDE", "PED_CROSS")}
+from .sim import P_CROSS, P_WAIT, Sim, VEH_KINDS
 
 # ---------------------------------------------------------------------------
 # Target combinations the recipes can build: (A, B, template, D, C)
@@ -168,7 +164,7 @@ def _add(sim, lane_id, s, v, kind=None):
 
 
 def _lead_frac(rng, cfg, kind):
-    """v3: a leader's desired speed as a fraction of the limit, from its kind's range."""
+    """A leader's desired speed as a fraction of the limit, from its kind's range."""
     return _u(rng, *(cfg["DT_V0_FRAC_HEAVY"] if VEH_KINDS[kind][0] >= 3 else cfg["DT_V0_FRAC"]))
 
 
@@ -226,7 +222,7 @@ def _stream(sim, rng, ln, s_conf, t_end, gap, v, route=None, v_gap=None):
     times, t = [], t_end
     while t > 1.2:
         times.append((t, v))
-        t -= sim.headway(ln.id) if sim.cfg.get("DT_V3") else _u(rng, 1.6, 2.4)   # v3: Issue 3 gaps
+        t -= sim.headway(ln.id)
     times.append((t_end + gap, v_gap or v))
     cws = {cw for _, _, cw in ln.crosswalks}
     sim.peds = [p for p in sim.peds if p.cw not in cws]   # nobody on its crosswalks: the stream keeps its timing
@@ -241,11 +237,9 @@ def _stream(sim, rng, ln, s_conf, t_end, gap, v, route=None, v_gap=None):
         if route is not None:
             u.turn_w = {x: float(x == route) + 1e-9 for x in "LSR"}
         u.v0frac = min(0.97, vk / ln.limit + 0.05)
-        if sim.cfg.get("DT_V3"):   # v3 (Issue 1): a normal desired speed; a zone it drives through slows it
-            u.v0frac = max(u.v0frac, sim.cfg["DT_V0_FRAC"][0])
+        u.v0frac = max(u.v0frac, sim.cfg["DT_V0_FRAC"][0])   # a normal desired speed; a zone it drives through slows it
         u.T, u.s0 = _u(rng, 1.0, 1.3), _u(rng, 1.5, 2.0)
-        if sim.cfg.get("DT_V3"):
-            u.T = max(u.T, sim.cfg["DT_ONCOMING_MIN"])
+        u.T = max(u.T, sim.cfg["DT_ONCOMING_MIN"])
 
 
 def _conflict_lane(m, ego_ln, ego_turn, legs, route="S"):
@@ -282,8 +276,8 @@ def _recipe_signal4(sim, rng, tg):
     A, B, C, D, V = tg["A"], tg["B"], tg["C"], tg["D"], tg.get("V")
     k = sim.ego_leg
     lanes = _in_lanes(m, k)
-    if cfg.get("DT_V3"):   # v3 (Issue 3): the opposite straight-and-right lane brings random gaps
-        sim.gap_lanes[_in_lanes(m, (k + 2) % 4)[1].id] = _u(rng, *cfg["DT_ONCOMING_MEAN"])
+    # the opposite straight-and-right lane brings random gaps
+    sim.gap_lanes[_in_lanes(m, (k + 2) % 4)[1].id] = _u(rng, *cfg["DT_ONCOMING_MEAN"])
     inner = D == "left turn" or A in ("arrow", "permissive left") or V == "left_gap" or \
         (A == "steady red" and V != "rtor" and rng.rand() < 0.3)
     ln = lanes[0] if inner else lanes[1]
@@ -380,7 +374,7 @@ def _recipe_signal4(sim, rng, tg):
         # B none: turns at once; B signal / lead vehicle: waits, enters late in the clip, turns after 31
         t_a = _u(rng, -1.0, 1.5) if C == "slow down" else \
             {"signal": _u(rng, 3.8, 5.0), "lead vehicle": _u(rng, 2.5, 3.5)}.get(B, _u(rng, 0.3, 1.2))
-        over[(own, "A")] = _u(rng, 6.0, 8.0) if cfg.get("DT_V3") else _u(rng, 4.5, 6.5)   # v3: 6 to 8 s arrows
+        over[(own, "A")] = _u(rng, 6.0, 8.0)   # 6 to 8 s arrows
         sched = (own, "A", t_a)
         d_line = dict(**{"pull away": _u(rng, 0.8, 2.0), "stop and go": _u(rng, 12.0, 30.0), "slow down": _u(rng, 15.0, 35.0)}).get(C, 15.0)
         stopped_at_line = C == "pull away"
@@ -406,7 +400,7 @@ def _recipe_signal4(sim, rng, tg):
                 v_on = 50 / 3.6 * _u(r, 0.7, 0.95)
                 _add_ahead(s, r, opp[1], _s_for_line(opp[1], d) - EGO_HALF - 1.0, 1.0, v=v_on, route="S",
                            cap_line=False)   # it has the green
-                d += v_on * s.headway(opp[1].id) if s.cfg.get("DT_V3") else _u(r, 10.0, 18.0)
+                d += v_on * s.headway(opp[1].id)
             out_cw = (k + 3) % 4      # nobody on the crosswalk the turn passes
             s.peds = [p for p in s.peds if p.cw != out_cw or p.state == 4]
         plan["post"].append(oncoming)
@@ -421,7 +415,7 @@ def _recipe_signal4(sim, rng, tg):
             plan["s"] = _s_for_line(ln, d_line + _u(rng, 6.5, 9.0))
             plan["post"].append(lambda s, e, r, ln=ln: _add_ahead(s, r, ln, e.s, max(ln.stop["s"] - e.front - 1.5 - 4.5, 1.5), v=0.0, kind="car", route=turn))
         else:
-            if C == "follow" and cfg.get("DT_V3"):   # v3: a leader at its normal speed, 1.0 to 1.8 s ahead
+            if C == "follow":   # a leader at its normal speed, 1.0 to 1.8 s ahead
                 kind = ("car", "suv", "truck")[int(rng.choice(3, p=[0.5, 0.3, 0.2]))]
                 f_l = _lead_frac(rng, cfg, kind)
                 v_f = ln.limit * f_l
@@ -429,11 +423,6 @@ def _recipe_signal4(sim, rng, tg):
                 plan.setdefault("extra", {})["v0frac"] = min(0.97, f_l + _u(rng, 0.05, 0.12))
                 plan["post"].append(lambda s, e, r, ln=ln, v=v_f, k=kind, f=f_l: _add_ahead(
                     s, r, ln, e.s, v * _u(r, 1.0, 1.8), v=v, kind=k, v0frac=f, route=turn))
-            elif C == "follow":   # a slow vehicle close ahead, followed within 7 m
-                v_f = _u(rng, 2.5, 4.0)
-                plan["v"], plan["cap"] = v_f * _u(rng, 1.0, 1.1), False
-                plan["post"].append(lambda s, e, r, ln=ln, v=v_f: _add_ahead(s, r, ln, e.s, _u(r, 4.0, 6.0), v=v,
-                                                                             v0frac=v / ln.limit, route=turn))
             else:
                 plan["post"].append(lambda s, e, r, ln=ln: _add_ahead(s, r, ln, e.s, _u(r, 5.0, 9.0), v=max(e.v * _u(r, 0.7, 0.9), 0.0), route=turn))
             plan.setdefault("extra", {}).update(T=_u(rng, 1.0, 1.3), s0=_u(rng, 1.5, 2.0))   # follows within 10 m
@@ -592,19 +581,16 @@ def _recipe_multilane(sim, rng, tg):
         elif B == "lead vehicle" and (D == "lane change" or V == "overtake"):
             # a slow vehicle the ego follows within 10 m; pulling out from behind it is its choice
             plan["clear_ahead"] = 150.0
-            v3 = sim.cfg.get("DT_V3")
-            v_l = 70 / 3.6 * (_u(rng, *sim.cfg["DT_OVERTAKE_V0_FRAC"]) if v3 else _u(rng, 0.18, 0.26))
+            v_l = 70 / 3.6 * _u(rng, *sim.cfg["DT_OVERTAKE_V0_FRAC"])
             kind = ["truck", "bus", "car"][int(rng.choice(3, p=[0.45, 0.35, 0.2]))]
-            if v3:   # v3 (D1): slower than the ego, above 60% of the limit; the ego closes in to within 2 s
-                ego_frac = _u(rng, *sim.cfg["DT_OVERTAKE_EGO_FRAC"])
+            # slower than the ego, above 60% of the limit; the ego closes in to within 2 s
+            ego_frac = _u(rng, *sim.cfg["DT_OVERTAKE_EGO_FRAC"])
             if pend:   # it catches up, slows, and is held up when the clip ends
-                plan["v"], gap0, patience = v0 * _u(rng, 0.85, 1.0), _u(rng, 30.0, 45.0), _u(rng, 1.5, 2.5)
-                if v3:
-                    gap0 = v_l * _u(rng, 1.4, 1.8) + (70 / 3.6 * ego_frac - v_l) * _u(rng, 2.0, 3.5)
+                plan["v"], _, patience = v0 * _u(rng, 0.85, 1.0), _u(rng, 30.0, 45.0), _u(rng, 1.5, 2.5)   # _ keeps the random stream
+                gap0 = v_l * _u(rng, 1.4, 1.8) + (70 / 3.6 * ego_frac - v_l) * _u(rng, 2.0, 3.5)
             else:      # already behind it for a while, pulls out within the clip
-                plan["v"], gap0, patience = v_l * _u(rng, 1.0, 1.1), _u(rng, 5.5, 7.5), _u(rng, 0.8, 1.5)
-                if v3:
-                    gap0 = v_l * _u(rng, 1.1, 1.6)
+                plan["v"], _, patience = v_l * _u(rng, 1.0, 1.1), _u(rng, 5.5, 7.5), _u(rng, 0.8, 1.5)   # _ keeps the random stream
+                gap0 = v_l * _u(rng, 1.1, 1.6)
             ego_extra = dict(overtaker=True, patience=patience, T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0), lc_quick=not pend)
             if not pend:
                 plan["post"].append(lambda s, e, r: setattr(e, "behind_since", s.t - e.patience - _u(r, 0.0, 0.3)))
@@ -621,27 +607,18 @@ def _recipe_multilane(sim, rng, tg):
             plan["post"].append(traffic)
         elif B == "lead vehicle":   # a slow vehicle close ahead: followed within 10 m
             plan["clear_ahead"] = 120.0
-            if sim.cfg.get("DT_V3"):   # v3: a leader at its normal speed (a truck or bus to slow down for)
-                kind = ("truck", "bus")[int(rng.randint(2))] if C == "slow down" else ("car", "truck", "bus")[int(rng.randint(3))]
-                f_l = _lead_frac(rng, sim.cfg, kind)
-                v_l = 70 / 3.6 * f_l
-                if C == "slow down":
-                    plan["v"], gap0 = v0 * _u(rng, 0.95, 1.0), _u(rng, 40.0, 60.0)
-                else:
-                    plan["v"], gap0 = v_l * _u(rng, 1.0, 1.05), v_l * _u(rng, 1.0, 1.8)
-                ego_frac = 0.97 if C == "slow down" else min(0.97, f_l + _u(rng, 0.05, 0.12))
-                ego_extra = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
-                plan["post"].append(lambda s, e, r, ln=ln, v=v_l, g=gap0, k=kind, f=f_l: _add_ahead(
-                    s, r, ln, e.s, g, v=v, v0frac=f, kind=k))
+            # a leader at its normal speed (a truck or bus to slow down for)
+            kind = ("truck", "bus")[int(rng.randint(2))] if C == "slow down" else ("car", "truck", "bus")[int(rng.randint(3))]
+            f_l = _lead_frac(rng, sim.cfg, kind)
+            v_l = 70 / 3.6 * f_l
+            if C == "slow down":
+                plan["v"], gap0 = v0 * _u(rng, 0.95, 1.0), _u(rng, 40.0, 60.0)
             else:
-                v_l = 70 / 3.6 * (_u(rng, 0.13, 0.2) if C == "follow" else _u(rng, 0.18, 0.3))
-                if C == "slow down":
-                    plan["v"], gap0 = v0 * _u(rng, 0.8, 1.0), _u(rng, 40.0, 60.0)
-                else:
-                    plan["v"], gap0 = v_l * _u(rng, 1.0, 1.15), _u(rng, 5.0, 8.0)
-                ego_extra = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
-                plan["post"].append(lambda s, e, r, ln=ln, v=v_l, g=gap0: _add_ahead(
-                    s, r, ln, e.s, g, v=v, v0frac=v / (70 / 3.6), kind=["car", "truck", "bus"][int(r.randint(3))]))
+                plan["v"], gap0 = v_l * _u(rng, 1.0, 1.05), v_l * _u(rng, 1.0, 1.8)
+            ego_frac = 0.97 if C == "slow down" else min(0.97, f_l + _u(rng, 0.05, 0.12))
+            ego_extra = dict(T=_u(rng, 1.0, 1.2), s0=_u(rng, 1.5, 2.0))
+            plan["post"].append(lambda s, e, r, ln=ln, v=v_l, g=gap0, k=kind, f=f_l: _add_ahead(
+                s, r, ln, e.s, g, v=v, v0frac=f, kind=k))
         else:   # none: free driving at the limit on an open stretch
             plan["clear_ahead"] = 300.0
             density = _u(rng, 0.15, 0.35)
@@ -718,7 +695,7 @@ def _recipe_residential(sim, rng, tg):
                 else:
                     _clear(sm, opp.id, s_o - 160.0, s_o + 15.0)
             plan["post"].append(parked)
-        if B == "lead vehicle" and sim.cfg.get("DT_V3"):   # v3: a car at its normal speed, 1.0 to 1.8 s ahead
+        if B == "lead vehicle":   # a car at its normal speed, 1.0 to 1.8 s ahead
             f_l = _lead_frac(rng, sim.cfg, "car")
             v_l = 50 / 3.6 * f_l
             plan["v"] = v_l * _u(rng, 1.0, 1.05)
@@ -739,7 +716,7 @@ def _recipe_residential(sim, rng, tg):
 RECIPES = dict(signal4=_recipe_signal4, stop4=_recipe_stop4, multilane=_recipe_multilane, residential=_recipe_residential)
 
 
-def _insert_ego_v2(sim, plan, rng):
+def _insert_ego(sim, plan, rng):
     cfg, ln, s = sim.cfg, plan["lane"], plan["s"]
     keep = []
     for u in sim.vehicles:
@@ -758,8 +735,8 @@ def _insert_ego_v2(sim, plan, rng):
     if ln.stop is not None:            # route and indicator decided before frame 0
         ego.turn_w = {t: float(t == plan["turn"]) + 1e-9 for t in "LSR"}
         sim._decide_route(ego, ln, indicate=False)   # the indicator comes on at its turn_dist
-        if sim.cfg.get("DT_V3") and len(ln.next) > 1 and plan.get("D") not in ("left turn", "right turn"):
-            ego.route_pending, ego.ind_pending = True, False   # v3 (Issue 6): its move is drawn per future
+        if len(ln.next) > 1 and plan.get("D") not in ("left turn", "right turn"):
+            ego.route_pending, ego.ind_pending = True, False   # its move is drawn per future
     v = sim._v0(ego) * rng.uniform(0.8, 1.0) if plan["v"] is None else plan["v"]
     index = sim._lane_index()
     lead, gap = sim._leader(ego, index)
@@ -806,7 +783,7 @@ def _attempt(rng, cfg, tg):
     plan.setdefault("D", tg["D"])
     while sim.frame < -1:              # warm-up without the ego
         sim.step_frame()
-    _insert_ego_v2(sim, plan, rng)
+    _insert_ego(sim, plan, rng)
     while sim.frame < cfg["DT_BRANCH_FRAME"]:
         sim.step_frame()
     branches = []
@@ -820,12 +797,12 @@ def _attempt(rng, cfg, tg):
 
 
 def route_draws(moves, K, rng):
-    """v3 (Issue 6, D2): the moves of K futures, drawn independently with equal odds."""
+    """The moves of K futures, drawn independently with equal odds."""
     return [moves[int(i)] for i in rng.randint(len(moves), size=K)]
 
 
 def _route_futures(br, seed, attempt, b, K):
-    """v3: the moves of the K futures of a branch whose ego has not begun its move by the fork, or None."""
+    """The moves of the K futures of a branch whose ego has not begun its move by the fork, or None."""
     ego = br.ego
     if ego is None or not ego.route_pending or ego.entered:
         return None
@@ -846,20 +823,18 @@ def _future(pk, T0):
                 signals=pk["signals"][T0 + 1:, :, :2].astype(np.int8),
                 rule_state=ex[:, 0, 3].astype(np.int8), yield_to=ex[:, 0, 4].astype(np.int8),
                 decisions=dec[dec[:, 0] > T0])
-    if "may_go" in pk:   # v3 (Issue 7)
+    if "may_go" in pk:
         fu["may_go"], fu["may_go_reason"] = pk["may_go"][T0 + 1:], pk["may_go_reason"][T0 + 1:]
         fu["ego_turn"] = pk["ego_turn"]
     return fu
 
 
-def simulate(seed, cfg, template=None, target=None):
+def simulate(seed, cfg, target):
     """Returns dict(map, template, branches=[record...], forks=[[future...] per branch], tries, ok,
     labels=[per branch], target). Each branch gets DT_FORKS futures forked at DT_CUE_FRAME with
     fresh draws; future 0 is its own continuation. An attempt is chosen on the labels of frames 0
     to 31 (A to D), on E (when the ego's choices fall, not how they come out) and on checks run
     over all of its futures together, never on how the branch's own future turned out."""
-    if target is None:
-        return simulate_v1(seed, cfg, template)
     rng = np.random.RandomState(seed)
     T0 = cfg["DT_CUE_FRAME"]
     total = cfg["FRAMES"] + cfg["FRAMES_FUTURE"]
@@ -890,15 +865,15 @@ def simulate(seed, cfg, template=None, target=None):
         for l, r in zip(labs, recs):
             l["E"] = end_label(r["decisions"], T0, T0 + 9)
         e_sel = [l["E"] for l in labs]
-        if cfg.get("DT_V3"):   # v3: E is judged on the provisional route, never on the move drawn for future 0
-            for b, (br, rt) in enumerate(zip(brs, routes)):
-                if rt is not None:
-                    prov = copy.deepcopy(br, memo={id(m): m})
-                    while prov.frame < total - 1:
-                        prov.step_frame()
-                    e_sel[b] = end_label(_pack(prov)["decisions"], T0, T0 + 9)
+        # E is judged on the provisional route, never on the move drawn for future 0
+        for b, (br, rt) in enumerate(zip(brs, routes)):
+            if rt is not None:
+                prov = copy.deepcopy(br, memo={id(m): m})
+                while prov.frame < total - 1:
+                    prov.step_frame()
+                e_sel[b] = end_label(_pack(prov)["decisions"], T0, T0 + 9)
         sc += 2 * (e_sel[0] == target.get("E", e_sel[0]))
-        lawful = cfg.get("DT_V3") and not cfg.get("DT_VIOLATION")   # v3: no rule broken in any record
+        lawful = not cfg.get("DT_VIOLATION")   # no rule broken in any record
         if sc <= best_key or not all(not r["ran_out"] and not cue_problems(r, m, cfg) and not (lawful and rules_check(r, m, cfg))
                                      for r in recs):
             continue
@@ -936,134 +911,8 @@ def simulate(seed, cfg, template=None, target=None):
 
 
 # ---------------------------------------------------------------------------
-# v1 sampler (docs/DRIVETOY.md §5), kept so v1 clips re-simulate unchanged
+# Records
 # ---------------------------------------------------------------------------
-
-def _plan_ego(sim, rng):
-    """Choose the ego's lane and where it will be when the clip starts (DT_EGO_*). The ego
-    itself is inserted only at the end of the warm-up (``_insert_ego``): placed earlier it
-    would make its own route decision — 30 m before the stop line — before the branch frame,
-    and the branches of a context would all show the same ego trajectory."""
-    m, cfg = sim.m, sim.cfg
-    t = m.template
-    plan = dict(extra={})
-    if t in ("signal4", "stop4"):
-        legs = sorted({m.lanes[i].leg for i in m.spawn_lanes})
-        leg = legs[int(rng.randint(len(legs)))]
-        lanes = sorted((m.lanes[i] for i in m.spawn_lanes if m.lanes[i].leg == leg), key=lambda l: l.lane_index)
-        ln = lanes[0] if (len(lanes) == 1 or rng.rand() < cfg["DT_EGO_INNER_P"]) else lanes[-1]
-        plan["s"] = ln.stop["s"] - rng.uniform(*cfg["DT_EGO_LINE_DIST"][t])
-        plan["extra"]["turn_w"] = dict(cfg["DT_EGO_TURN"])
-        plan["cw"] = leg if any(c["id"] == leg for c in m.crosswalks) else None
-    elif t == "multilane":
-        nb = sorted((m.lanes[i] for i in m.spawn_lanes if m.lanes[i].pts[-1, 1] > m.lanes[i].pts[0, 1]),
-                    key=lambda l: l.lane_index)
-        if rng.rand() < cfg["DT_EGO_DROP_P"]:
-            ln = nb[-1]
-            plan["s"] = ln.length - rng.uniform(125.0, 200.0)   # mandatory merge signals 120 m before the end
-        else:
-            ln = nb[int(rng.randint(len(nb) - 1))]
-            plan["s"] = rng.uniform(120.0, 260.0)
-        plan["extra"]["v0frac"] = 0.97
-        plan["cw"] = None
-    else:
-        ln = m.lanes[m.spawn_lanes[int(rng.randint(2))]]
-        plan["s"] = ln.crosswalks[0][0] - rng.uniform(*cfg["DT_EGO_CW_DIST"])
-        plan["cw"] = 0
-    plan["lane"] = ln
-    sim.next_slot = max(sim.next_slot, 1)     # slot 0 stays the ego's
-    return plan
-
-
-def _insert_ego(sim, plan, rng):
-    """Put the ego into the warmed-up traffic at slot 0, with a safe speed, and give the
-    crosswalk it is approaching pedestrians that reach the curb just after the branch frame."""
-    cfg, ln, s = sim.cfg, plan["lane"], plan["s"]
-    keep = []
-    for u in sim.vehicles:
-        if u.route[u.where()[0]] == ln.id or (u.lc is not None and u.lc.get("from") == ln.id):
-            us = u.where()[1]
-            if abs(us - s) < u.L / 2 + 2.25 + 6.0:
-                continue                                  # no room: make room
-            if s < us < s + 60.0 and rng.rand() < cfg["DT_EGO_CLEAR_P"]:
-                continue                                  # thin the queue ahead
-        keep.append(u)
-    sim.vehicles = keep
-    ego = sim.add_vehicle(ln.id, s, kind="car", ego=True, slot=0)
-    for k, v in plan["extra"].items():
-        setattr(ego, k, v)
-    v = sim._v0(ego) * rng.uniform(0.8, 1.0)
-    index = sim._lane_index()
-    lead, gap = sim._leader(ego, index)
-    if lead is not None:   # keep well clear of R6 (gap >= max(1 m, 0.5 s * v)) and closing slowly
-        v = min(v, lead.v + 0.5 * max(gap - 3.0, 0.0), max(gap - 2.0, 0.0) / 1.2)
-    if ln.stop is not None:
-        v = min(v, float(np.sqrt(2 * 2.0 * max(ln.stop["s"] - ego.front - 2.0, 0.0))))
-    ego.v = v
-    ego.stopped = v < 0.3
-    # nobody may be following the new ego too closely either
-    sim.vehicles = [u for u in sim.vehicles if u is ego or u.route[u.where()[0]] != ln.id
-                    or u.where()[1] > s or s - u.where()[1] - (u.L + ego.L) / 2 > 2.0 + 1.2 * u.v]
-    if plan["cw"] is not None and rng.rand() < cfg["DT_EGO_PED_P"]:
-        paths = [p for p in sim.m.ped_paths if p["cw"] == plan["cw"]]
-        for path in [paths[i] for i in rng.permutation(len(paths))[:1 + int(rng.rand() < 0.4)]]:
-            ped = sim.add_ped(path)
-            if ped is not None:
-                L = ped.cum[-1]
-                ped.s = max(0.0, L - ped.speed * rng.uniform(1.4, 3.6))   # curb reached 1.2-3.4 s into the clip
-                ped.heading = ped.path_heading()
-    return ego
-
-
-def _bias_signal(sim, rng, ego_lane):
-    """signal4: start the controller so the ego's own light does something within the clip."""
-    sig, cfg = sim.signals, sim.cfg
-    if sig is None:
-        return
-    own = ego_lane.stop["group"]
-    other = [g for g in sig.groups if g != own][0]
-    names = list(cfg["DT_EGO_SIGNAL"])
-    w = np.array([cfg["DT_EGO_SIGNAL"][n] for n in names], float)
-    pick = names[int(rng.choice(len(names), p=w / w.sum()))]
-    lo, hi = cfg["SIG_GREEN_WALK"]
-    if pick == "own_green":
-        sig.set_phase(own, "G", rng.uniform(0, lo), sim.t)
-    elif pick == "green_soon":
-        k = rng.randint(3)
-        if k == 0:     # the cross street is flashing: its yellow comes within the warm-up
-            el = rng.uniform(lo, hi)
-            sig.set_phase(other, "G", el, sim.t, walk=el - rng.uniform(0, cfg["SIG_FLASH"]))
-        elif k == 1:
-            sig.set_phase(other, "Y", rng.uniform(0, cfg["SIG_YELLOW"]), sim.t)
-        else:
-            sig.set_phase(other, "AR", rng.uniform(0, cfg["SIG_ALL_RED"]), sim.t)
-
-
-def _in_view(ego, pos, cfg):
-    d = np.asarray(pos[:2]) - ego[:2]
-    dist = np.hypot(*d)
-    if dist < 1e-3:
-        return True
-    ang = np.angle(np.exp(1j * (np.arctan2(d[1], d[0]) - ego[2])))
-    return dist <= cfg["DT_VIEW_RANGE"] and abs(ang) <= np.deg2rad(cfg["DT_VIEW_HALF_ANGLE"])
-
-
-def count_view_events(rec, m, cfg):
-    lo, hi = cfg["DT_BRANCH_FRAME"] + 1, cfg["FRAMES"] - 1
-    heads = [h["pos"] for h in m.signal_heads if h["kind"] == "veh"]
-    n = 0
-    for f, typ, a, b, val in rec["events"]:
-        f, typ, a = int(f), int(typ), int(a)
-        if not (lo <= f <= hi) or typ not in DECISION_EVENTS:
-            continue
-        ego = rec["ego"][f]
-        if typ == EV["SIGNAL"]:
-            if any(_in_view(ego, p, cfg) for p in heads):
-                n += 1
-        elif a >= 0 and rec["agents"][f, a, 9] > 0 and _in_view(ego, rec["agents"][f, a, 1:3], cfg):
-            n += 1
-    return n
-
 
 def _pack(sim):
     fr = sim.frames
@@ -1075,7 +924,7 @@ def _pack(sim):
         events=np.array(events, np.float32).reshape(-1, 5), ran_out=sim.ego_ran_out,
         decisions=np.array(sim.decisions, np.float32).reshape(-1, len(DEC_COLS)), drivers=_drivers(sim),
         routes=_routes(sim))
-    if fr and "may_go" in fr[0]:   # v3 (Issue 7)
+    if fr and "may_go" in fr[0]:
         mg = np.stack([f["may_go"] for f in fr])
         pk["may_go"], pk["may_go_reason"] = mg[:, 0], mg[:, 1]
         pk["ego_turn"] = np.int8({"L": 1, "S": 2, "R": 3}.get(getattr(sim.ego, "turn", None), 0))   # its final move
@@ -1100,35 +949,3 @@ def _routes(sim):
     for u in sim.vehicles:
         r[u.slot, :len(u.route[-4:])] = u.route[-4:]
     return r
-
-
-def simulate_v1(seed, cfg, template=None):
-    """Returns dict(map, template, branches=[record...], tries)."""
-    rng = np.random.RandomState(seed)
-    names = list(cfg["DT_TEMPLATES"])
-    w = np.array([cfg["DT_TEMPLATES"][n] for n in names], float)
-    total = cfg["FRAMES"] + cfg["FRAMES_FUTURE"]
-    for attempt in range(cfg["DT_RESAMPLE_TRIES"]):
-        tmpl = template or names[int(rng.choice(len(names), p=w / w.sum()))]
-        m = build_map(tmpl, rng, cfg)
-        sim = Sim(m, cfg, rng)
-        plan = _plan_ego(sim, rng)
-        density = rng.uniform(*cfg["DT_STOP4_DENSITY"]) if tmpl == "stop4" else rng.uniform(0.3, 1.0)
-        sim.populate(density, ped_rate=rng.uniform(0.05, 0.25) if m.ped_paths else 0.0)
-        _bias_signal(sim, rng, plan["lane"])
-        while sim.frame < -1:                      # warm-up without the ego
-            sim.step_frame()
-        _insert_ego(sim, plan, rng)
-        while sim.frame < cfg["DT_BRANCH_FRAME"]:
-            sim.step_frame()
-        branches = []
-        for b in range(cfg["DT_BRANCHES"]):
-            br = copy.deepcopy(sim, memo={id(m): m})
-            br.rng = np.random.RandomState(rng.randint(2 ** 31 - 1))
-            while br.frame < total - 1:
-                br.step_frame()
-            branches.append(_pack(br))
-        ok = all(not r["ran_out"] and count_view_events(r, m, cfg) >= cfg["DT_MIN_EVENTS"] for r in branches)
-        if ok or attempt == cfg["DT_RESAMPLE_TRIES"] - 1:
-            return dict(map=m, template=tmpl, branches=branches, tries=attempt + 1, ok=ok,
-                        colors={u.slot: u.color for u in sim.vehicles + sim.peds})

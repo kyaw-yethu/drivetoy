@@ -16,5 +16,5 @@ python3 scripts/v3_checks.py $D/val --resim > $L/checks_val.log 2>&1 || st "chec
 python3 scripts/v3_checks.py $D/test > $L/checks_test.log 2>&1 || st "checks test FAILED"
 python3 scripts/v3_checks.py $D/train > $L/checks_train.log 2>&1 || st "checks train FAILED"
 st "viz"
-python3 scripts/v2s_viz.py $D/val --out $D/viz --suffix v3 > $L/viz.log 2>&1 || st "viz FAILED"
+python3 scripts/make_gifs.py $D/val --out $D/viz > $L/viz.log 2>&1 || st "viz FAILED"
 st "DONE build"

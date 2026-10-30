@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Checks of a v3 build (version-3-revision.md): the v2s checks (scripts/v2s_checks.py), then one
+"""Checks of a v3 build (docs/version-3-revision.md): the base checks (scripts/base_checks.py), then one
 entry per issue under "v3" in <split>/checks.json.
 
 1. leads: vehicles whose desired speed is outside their kind's range;
@@ -24,7 +24,7 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-import v2s_checks
+import base_checks
 from f_toy.datasets.drivetoy.choices import CHOICE_KINDS
 from f_toy.datasets.drivetoy.diversity import ASPECTS, clip_labels
 from f_toy.datasets.drivetoy.map_io import load_map
@@ -194,7 +194,7 @@ def _init(root):
 def main():
     resim = "--resim" in sys.argv
     sys.argv = [sys.argv[0]] + [a for a in sys.argv[1:]]
-    v2s_checks.main()                                  # writes checks.json with the v2s checks
+    base_checks.main()                                  # writes checks.json with the base checks
     root = Path([a for a in sys.argv[1:] if not a.startswith("--")][0])
     _init(root)
     N = len(ANN["diversity"])

@@ -7,10 +7,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
 from f_toy.datasets.drivetoy.roads import LANE_W, build_residential
 
-V3 = dict(CFG, **V3_OVERRIDES)
+V3 = dict(CFG)
 
 
 def test_school_zone():
@@ -31,12 +31,6 @@ def test_school_zone():
             assert np.isclose(t[:, 0].mean(), sgn * LANE_W / 2)
             assert np.isclose(t[0, 1], y_in + sgn * 2.0)          # apex, nearest the approaching driver
             assert np.allclose(t[1:, 1], y_in + sgn * 6.0)        # base, farther into the zone
-
-
-def test_v2_unchanged():
-    m = build_residential(np.random.RandomState(0), CFG)
-    assert len([s for s in m.surfaces if s["kind"] == "school"]) == 2
-    assert not [mk for mk in m.markings if mk["style"] == "school_triangle"]
 
 
 if __name__ == "__main__":

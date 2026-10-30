@@ -21,7 +21,7 @@ def style_c50(cfg, kind, style):
 
 
 def cautious_gap(cfg, kind="left_gap", p=0.9):
-    """v3: the cue at which even the most cautious driver (style 0) takes the assertive outcome
+    """The cue at which even the most cautious driver (style 0) takes the assertive outcome
     with probability p (5.27 s of oncoming gap for left_gap with the defaults)."""
     c50, w = style_c50(cfg, kind, 0.0)
     return float(c50 + w * np.log(p / (1.0 - p)))
@@ -36,12 +36,12 @@ def biased(rng, rng_range, style, corr, up=True):
 
 
 def driver_values(rng, cfg, style, heavy=False):
-    """Per-driver values (README, "Minor variation"), drawn once when the agent appears. v3: trucks
+    """Per-driver values (README, "Minor variation"), drawn once when the agent appears. Trucks
     and buses (``heavy``) draw their desired speed from DT_V0_FRAC_HEAVY."""
     c = cfg["DT_STYLE_CORR"]
     lanes = cfg["DT_LANE_OFFSET"], cfg["DT_LANE_DRIFT"], cfg["DT_SPEED_DRIFT"], cfg["DT_TURN_OFFSET"]
     return dict(
-        v0frac=biased(rng, cfg["DT_V0_FRAC_HEAVY"] if heavy and cfg.get("DT_V3") else cfg["DT_V0_FRAC"], style, c),
+        v0frac=biased(rng, cfg["DT_V0_FRAC_HEAVY"] if heavy else cfg["DT_V0_FRAC"], style, c),
         T=biased(rng, cfg["DT_IDM_T"], style, c, up=False),
         s0=biased(rng, cfg["DT_IDM_S0"], style, c, up=False),
         a=biased(rng, cfg["DT_IDM_A"], style, c),

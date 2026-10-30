@@ -7,12 +7,12 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
 from f_toy.datasets.drivetoy.roads import build_signal4
 from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
 from f_toy.datasets.drivetoy.sim import EV, Sim
 
-V3 = dict(CFG, **V3_OVERRIDES, DT_FORKS=1)
+V3 = dict(CFG, DT_FORKS=1)
 
 
 def test_headway_law():

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Build a DriveToy v3 split (version-3-revision.md): simulate with target labels, render, assemble.
+"""Build a DriveToy v3 split (docs/version-3-revision.md): simulate with target labels, render, assemble.
 
     python scripts/build_drivetoy_v3.py --split pilot
     python scripts/build_drivetoy_v3.py --split train
@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 os.environ["LD_LIBRARY_PATH"] = "/root/opt/cuda525:" + os.environ.get("LD_LIBRARY_PATH", "")   # Blender finds the GPUs only so
 
 from f_toy.datasets.drivetoy.builder import build_to_disk
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG, V3_OVERRIDES
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG
 
 SPLITS = dict(pilot=(500, 30_000_000, 1), train=(10_000, 0, 1), val=(1_500, 20_000_000, 1), test=(1_500, 10_000_000, 2),
               smoke=(8, 40_000_000, 1))
@@ -33,7 +33,7 @@ def main():
     ap.add_argument("--no-render", action="store_true")
     args = ap.parse_args()
     n, seed, k = SPLITS[args.split]
-    cfg = dict(DRIVETOY_DEFAULT_CFG, **V3_OVERRIDES)
+    cfg = dict(DRIVETOY_DEFAULT_CFG)
     cfg.update(NUM_SAMPLES=n * k, SEED=seed, DT_BRANCHES=k, DT_RENDER_GPUS=args.gpus, DT_WRITE_VIDEOS=args.split != "train")
     if args.forks:
         cfg["DT_FORKS"] = args.forks

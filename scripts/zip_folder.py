@@ -2,7 +2,7 @@
 """Zip a folder as one ZIP64 archive: already compressed render/*.npz files are stored, the rest
 deflated; .git and __pycache__ are left out.
 
-    python scripts/v2s_zip.py /root/projects/drive_v2s /dev/shm/drive_v2s_data.zip
+    python scripts/zip_folder.py /root/projects/drive_v3 /dev/shm/drive_v3_data.zip
 """
 import os
 import sys

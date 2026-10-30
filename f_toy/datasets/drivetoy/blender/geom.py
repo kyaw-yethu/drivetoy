@@ -11,7 +11,7 @@ def seg_dist(p, a, b):
 
 
 def crown_blocks(c, r, segs, margin=0.3):
-    """v3 (Issue 5): whether a crown of radius r centred at c comes within ``margin`` of any of the
+    """Whether a crown of radius r centred at c comes within ``margin`` of any of the
     sightlines ``segs`` (rows x0, y0, z0, x1, y1, z1)."""
     segs = np.asarray(segs, float).reshape(-1, 6)
     if not len(segs):

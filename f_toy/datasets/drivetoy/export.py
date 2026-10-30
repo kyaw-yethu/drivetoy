@@ -14,7 +14,7 @@ def _l(a):
 
 
 def sightlines(m, signs, heads, z_eye=1.4, near=10.0, far=60.0, step=5.0, reach=12.0):
-    """v3 (Issue 5): segments [x0, y0, z0, x1, y1, z1] from a driver's eye on each approach lane,
+    """Segments [x0, y0, z0, x1, y1, z1] from a driver's eye on each approach lane,
     every ``step`` m from ``near`` to ``far`` m before each sign and signal head that faces that
     lane's traffic within ``reach`` m to the side, to the sign's face (2.3 m) or the head."""
     objs = [(np.asarray(s["pos"][:2], float), 2.3, float(s["heading"])) for s in signs] + \
@@ -47,8 +47,8 @@ def scene_dict(result, branch, cfg, seed):
     tod = rng.choice(["day", "day", "day", "dusk"])
     sun_el = float(rng.uniform(25, 65) if tod == "day" else rng.uniform(3, 10))
     sun_az = float(rng.uniform(0, 360))
-    if tod == "dusk" and cfg.get("DT_V2"):
-        # v2: a low sun ahead of the camera backlights the asphalt, which Cycles renders noisy at
+    if tod == "dusk":
+        # a low sun ahead of the camera backlights the asphalt, which Cycles renders noisy at
         # 16 samples: keep it DT_DUSK_SUN_AWAY degrees from every heading of the ego in the clip
         heads = np.degrees(np.asarray(rec["ego"][:T, 2]))
         for _ in range(50):
@@ -62,10 +62,10 @@ def scene_dict(result, branch, cfg, seed):
         ego_leg = getattr(m.lanes[lid], "leg", None) if lid >= 0 else None
         if ego_leg is not None:
             break
-    # v2: only the ego's own approach has its heads moved nearer (pos_near, see roads._four_way)
+    # only the ego's own approach has its heads moved nearer (pos_near, see roads._four_way)
     hpos = lambda h: h["pos_near"] if ("pos_near" in h and h["leg"] == ego_leg) else h["pos"]
     if cfg.get("DT_HIDE_NEAR_HEADS") and m.signal_heads:
-        # v2: vehicle heads on the ego's near side of the junction (those of the opposite and the
+        # vehicle heads on the ego's near side of the junction (those of the opposite and the
         # left-hand approach, on the two near corners) are not rendered; the far ones stay
         for f in range(T):
             lid = int(rec["extra"][f, 0, 0])
@@ -110,8 +110,7 @@ def scene_dict(result, branch, cfg, seed):
         signals=_l(rec["signals"][:T]), ego=_l(rec["ego"][:T]),
         colors={str(k): int(v) for k, v in result["colors"].items()},
     )
-    if cfg.get("DT_V3"):   # v3 (Issue 5): where no tree crown may stand
-        sc["sightlines"] = sightlines(m, sc["signs"], sc["heads"])
+    sc["sightlines"] = sightlines(m, sc["signs"], sc["heads"])   # where no tree crown may stand
     return sc
 
 

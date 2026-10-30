@@ -95,7 +95,7 @@ class Lane:
         self.prev = None            # connectors: the incoming lane they leave from
         self.closed_end = False     # lane drop: the lane ends, vehicles must leave it
         self.lane_index = 0         # 0 = innermost
-        self.inflow_w = 1.0         # v3: weight of this lane in its approach's traffic (Issue 4)
+        self.inflow_w = 1.0         # weight of this lane in its approach's traffic (Issue 4)
 
     def pos(self, s):
         s = np.clip(s, 0.0, self.length)
@@ -169,7 +169,7 @@ def _arc(c, r, a0, a1, n=12):
 
 
 def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_cw=(), heads_corner=False,
-              v3=False, left_share=0.25):
+              left_share=0.25):
     """Legs start ``inner`` = half + rc from the centre, where ``rc`` is the
     curb radius of the rounded corners; the crosswalk sits just outside the
     corner fillet and the stop line 1 m before it. Legs in ``force_cw`` always
@@ -204,12 +204,12 @@ def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_
         for j in range(n_lanes - 1):
             inc[k, j].right, inc[k, j + 1].left = inc[k, j + 1].id, inc[k, j].id
             out[k, j].right, out[k, j + 1].left = out[k, j + 1].id, out[k, j].id
-            # no lane changes on the approach (lanes are chosen by movement); v3: the line, and so
-            # the ban, is solid for the last 30 m only, like its markings
-            s0 = inc[k, j].length - 30.0 if v3 else 0.0
+            # no lane changes on the approach (lanes are chosen by movement); the line, and so the
+            # ban, is solid for the last 30 m only, like its markings
+            s0 = inc[k, j].length - 30.0
             inc[k, j].solid_right = [(s0, inc[k, j].length)]
             inc[k, j + 1].solid_left = [(s0, inc[k, j + 1].length)]
-        if v3 and n_lanes == 2:   # v3: the left-only lane carries left_share of the approach
+        if n_lanes == 2:   # the left-only lane carries left_share of the approach
             inc[k, 0].inflow_w, inc[k, 1].inflow_w = 2 * left_share, 2 * (1 - left_share)
 
     movements = {}  # (k, j) -> [(turn, leg_out, j_out)]
@@ -294,7 +294,7 @@ def _four_way(rng, template, n_lanes, limit, signalised, crosswalk_p=1.0, force_
             m.signal_heads.append(dict(kind="veh_pole", leg=k, group=g, lane=None, pos=np.array([pos[0], pos[1], 3.0]), heading=face))
             if heads_corner:
                 m.signal_heads[-1]["pos_near"] = np.array([pn[0], pn[1], 3.0])
-            # v2 near-side head on a pole at the near-right corner, on the junction side of the
+            # near-side head on a pole at the near-right corner, on the junction side of the
             # crosswalk: at the stop line itself it would sit outside the 70 deg view of the first car
             pos = R @ np.array([half + 0.8, -(y_cw0 - 0.5)])
             m.signal_heads.append(dict(kind="veh_near", leg=k, group=g, lane=None, pos=np.array([pos[0], pos[1], 3.0]), heading=face))
@@ -369,7 +369,7 @@ def _buildings_around(m, rng, inner, L, corner):
 
 def build_signal4(rng, cfg, protected=None, force_cw=()):
     m = _four_way(rng, "signal4", 2, 50 / 3.6, True, force_cw=force_cw, heads_corner=cfg.get("DT_HEADS_CORNER", False),
-                  v3=bool(cfg.get("DT_V3")), left_share=cfg.get("DT_LEFT_SHARE", 0.25))
+                  left_share=cfg["DT_LEFT_SHARE"])
     m.protected_left = rng.rand() < cfg["SIG_ARROW_P"]
     if protected is not None:
         m.protected_left = bool(protected)
@@ -433,7 +433,7 @@ def build_multilane(rng, cfg, **_):
     m.markings.append(dict(style="edge", pts=np.array([[-2 * LANE_W, L0], [-2 * LANE_W, L1]])))
     for y in (drop - 60.0, drop - 30.0):
         m.markings.append(dict(style="arrow_merge_left", pts=np.array([[2.5 * LANE_W, y - 4], [2.5 * LANE_W, y]])))
-    # v2: twice the size, 45 m before the end, so it is still ahead of an ego that starts 60-80 m out
+    # twice the usual size, 45 m before the end, so it is still ahead of an ego that starts 60-80 m out
     m.signs.append(dict(kind="lane_ends", pos=np.array([3 * LANE_W + 1.0, drop - 45.0]), heading=-np.pi / 2, size=2.0))
     m.signs.append(dict(kind="speed", pos=np.array([3 * LANE_W + 1.0, L0 + 30.0]), heading=-np.pi / 2, value=70))
     for i in range(10):   # cone taper closing lane 2
@@ -478,17 +478,13 @@ def build_residential(rng, cfg, **_):
         m.markings.append(dict(style="edge", pts=np.array([[side * LANE_W, L0], [side * LANE_W, L1]])))
         m.markings.append(dict(style="edge", pts=np.array([[side * half, L0], [side * half, L1]])))
     m.surfaces.append(dict(kind="road", poly=np.array([[-half, L0], [half, L0], [half, L1], [-half, L1]])))
-    if cfg.get("DT_V3"):
-        # v3 (Issue 8): red pavement on both lanes along the whole zone, and a filled blue triangle
-        # (2.0 m by 4 m) on each lane 2 m into its zone, apex toward the approaching driver
-        m.surfaces.append(dict(kind="school", poly=np.array([[-LANE_W, zone[0]], [LANE_W, zone[0]], [LANE_W, zone[1]], [-LANE_W, zone[1]]])))
-        for sgn, y_in in ((1.0, zone[0]), (-1.0, zone[1])):
-            xc = sgn * LANE_W / 2
-            m.markings.append(dict(style="school_triangle", pts=np.array(
-                [[xc, y_in + sgn * 2.0], [xc - 1.0, y_in + sgn * 6.0], [xc + 1.0, y_in + sgn * 6.0]])))
-    else:
-        m.surfaces.append(dict(kind="school", poly=np.array([[0.0, zone[0]], [LANE_W, zone[0]], [LANE_W, zone[0] + 15], [0.0, zone[0] + 15]])))
-        m.surfaces.append(dict(kind="school", poly=np.array([[-LANE_W, zone[1] - 15], [0.0, zone[1] - 15], [0.0, zone[1]], [-LANE_W, zone[1]]])))
+    # red pavement on both lanes along the whole zone, and a filled blue triangle
+    # (2.0 m by 4 m) on each lane 2 m into its zone, apex toward the approaching driver
+    m.surfaces.append(dict(kind="school", poly=np.array([[-LANE_W, zone[0]], [LANE_W, zone[0]], [LANE_W, zone[1]], [-LANE_W, zone[1]]])))
+    for sgn, y_in in ((1.0, zone[0]), (-1.0, zone[1])):
+        xc = sgn * LANE_W / 2
+        m.markings.append(dict(style="school_triangle", pts=np.array(
+            [[xc, y_in + sgn * 2.0], [xc - 1.0, y_in + sgn * 6.0], [xc + 1.0, y_in + sgn * 6.0]])))
     for x0, x1 in ((half, half + SW_W), (-half - SW_W, -half)):
         m.surfaces.append(dict(kind="sidewalk", poly=np.array([[x0, L0], [x1, L0], [x1, L1], [x0, L1]])))
     m.signs.append(dict(kind="school_zone", pos=np.array([half + 1.0, zone[0]]), heading=-np.pi / 2, value=30))

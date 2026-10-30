@@ -57,7 +57,7 @@ DRIVETOY_DEFAULT_CFG = dict(
     R0_SPEED_TOL=0.5,
     R1_STOP_DECEL=3.0, R1_STOP_DECEL_CHECK=2.0,
     R3_GAP_POLICY=4.0, R3_GAP_CHECK=2.5,
-    R4_STOP_TIME=1.0, R4_STOP_V=0.3, R4_STOP_ZONE=5.0, R4_TIE=0.4,
+    R4_STOP_TIME=0.8, R4_STOP_V=0.3, R4_STOP_ZONE=5.0, R4_TIE=0.4,
     R5_LATERAL_CHECK=3.0,
     R6_GAP_MIN=1.0, R6_HEADWAY_CHECK=0.5,
     R7_SIGNAL_POLICY=1.6, R7_SIGNAL_CHECK=1.0, R7_FOLLOWER_DECEL_POLICY=2.0, R7_FOLLOWER_DECEL_CHECK=4.0,
@@ -72,7 +72,7 @@ DRIVETOY_DEFAULT_CFG = dict(
     SIG_GREEN_WALK=(3.0, 10.0),   # WALK part of green; hidden, drawn lazily (short: a toy wants frequent changes)
     SIG_FLASH=6.0,                # flashing don't-walk (+ countdown) at the end of green
     SIG_YELLOW=3.0, SIG_ALL_RED=1.5,
-    SIG_ARROW=(3.0, 5.0), SIG_ARROW_P=0.5,   # protected-left phase before the green ball
+    SIG_ARROW=(6.0, 8.0), SIG_ARROW_P=0.5,   # protected-left phase before the green ball
     SIG_COUNTDOWN_P=0.6,
 
     # ---- pedestrians ----
@@ -86,22 +86,21 @@ DRIVETOY_DEFAULT_CFG = dict(
     DT_RENDER_PROCS=4,       # Blender processes per GPU (128 px frames leave the GPU mostly idle)
     DT_RENDER_SAMPLES=16,
     DT_CUE_SCALE=1.5,        # size multiplier for vehicle lamps and pedestrian signal heads
-    DT_SIGNAL_SCALE=4.5,     # v2: size multiplier for vehicle signal heads (real size = 1)
-    DT_SIGNAL_LAYOUT="vertical",   # v2: "horizontal" puts the lamps of the mast-arm heads side by side
-    DT_POLE_HEAD=False,      # v2: no head on the far-right corner pole (the pole still carries the mast arm)
-    DT_NEAR_HEADS=False,     # v2: no near-side head at the near-right corner
-    DT_HEADS_CORNER=True,    # v2: far-side pole on the nose of the far-right corner, so the heads sit nearer the approach
-    DT_OVERTAKE_CHECK=True,  # v2: reject a lane change that does not close in on a slower leader (diversity.overtake_problems)
-    DT_HIDE_NEAR_HEADS=True,   # v2: do not render vehicle heads on the ego's near side of the junction
-    DT_INDICATOR_SCALE=2.25, # v2: size multiplier for indicator lamps
-    DT_DUSK_SUN_AWAY=60.0,   # v2: at dusk the sun stays this many degrees away from the camera's heading
-    DT_LAMP_EMIT=dict(brake=1.5, left=2.5, right=2.5, signal=1.0, ped=3.0),   # emission strengths (AgX desaturates brighter lamps; v1 used 6/10/10/12/8, v1 signal 4.0)
+    DT_SIGNAL_SCALE=4.5,     # size multiplier for vehicle signal heads (real size = 1)
+    DT_SIGNAL_LAYOUT="vertical",   # "horizontal" puts the lamps of the mast-arm heads side by side
+    DT_POLE_HEAD=False,      # no head on the far-right corner pole (the pole still carries the mast arm)
+    DT_NEAR_HEADS=False,     # no near-side head at the near-right corner
+    DT_HEADS_CORNER=True,    # far-side pole on the nose of the far-right corner, so the heads sit nearer the approach
+    DT_OVERTAKE_CHECK=True,  # reject a lane change that does not close in on a slower leader (diversity.overtake_problems)
+    DT_HIDE_NEAR_HEADS=True,   # do not render vehicle heads on the ego's near side of the junction
+    DT_INDICATOR_SCALE=2.25, # size multiplier for indicator lamps
+    DT_DUSK_SUN_AWAY=60.0,   # at dusk the sun stays this many degrees away from the camera's heading
+    DT_LAMP_EMIT=dict(brake=1.5, left=2.5, right=2.5, signal=1.0, ped=3.0),   # emission strengths (AgX desaturates brighter lamps)
     DT_SIGNAL_COLORS=dict(red=(1.0, 0.02, 0.0), yellow=(1.0, 0.5, 0.0), green=(0.0, 0.85, 0.08), arrow=(0.0, 0.85, 0.08)),
-        # v2: deeper signal lamps, so the v1 VAE keeps green apart from yellow (v1 green was 0.1, 1.0, 0.3 at 4.0)
+        # deeper signal lamps, so a VAE keeps green apart from yellow
     DT_VIEW=("AgX", "AgX - Medium High Contrast"),   # Blender view transform and look
 
-    # ---- v2: cued futures and ego-first sampling (DATASETv2_plan.md) ----
-    DT_V2=True,              # cued signal timing, decided ego intent, decided pedestrians, target-driven scenes
+    # ---- cued futures and ego-first sampling ----
     DT_CUE_FRAME=31,         # last visible frame: hidden variables the ego reacts to are decided by then
     DT_TRIES=30,             # scene attempts per clip while looking for its target labels
     # shares of the four diversity aspects (each sums to 1); A is met, B, C, D are targets
@@ -125,7 +124,7 @@ DRIVETOY_DEFAULT_CFG = dict(
     DT_TURN_OFFSET=0.4,      # tight or wide arc: sideways offset at the middle of a turn, +- metres
     DT_SPEED_DRIFT=0.03,     # desired speed wanders by this fraction (capped at 0.99 of the limit)
     DT_DRIFT_LEN=(60.0, 150.0),   # metres per period of both drifts
-    DT_START_DELAY=(0.3, 1.5),    # s before a stopped vehicle moves off once it may
+    DT_START_DELAY=(0.2, 0.6),    # s before a stopped vehicle moves off once it may
     DT_STOP_DIST=(0.5, 3.0),      # where a vehicle stops before its line, metres
     DT_TURN_DIST=(20.0, 45.0),    # turn indicator onset before the line, metres
     DT_LC_LEAD=(1.5, 4.0),        # lane change: indicator before the move, s (R7 checks 1.0 s)
@@ -148,28 +147,22 @@ DRIVETOY_DEFAULT_CFG = dict(
                    merge=(2.0, 0.4, 0.5),       # cue: smaller time gap in the target lane, s; True = take it
                    cutin=(0.9, 0.12, 0.15),     # cue: time gap left to the car behind, s; True = cut in
                    ped_cross=(3.0, 0.6, 0.8)),  # cue: nearest vehicle's time to the crosswalk, s; True = cross
-    DT_FOLLOW_GAP=7.0,       # speed label "follow": the leader binds within this many metres
     DT_LEAD_GAP=10.0,        # causes "lead vehicle" and "parked obstacle": within this many metres
     DT_CUTIN_GAP_S=2.0,      # cause "cut-in vehicle": within this time gap
     DT_FORKS=16,             # futures per sample forked at DT_CUE_FRAME (future 0 is the sample's own)
     DT_WRITE_VIDEOS=True,    # write videos.npy (the train split keeps render/ only)
     DT_PENDING_MIN=0.2,      # E: pending gets more weight while its share is below this
 
-    # ---- v3 (version-3-revision.md; plan docs/superpowers/plans/2026-10-29-drivetoy-v3.md) ----
-    DT_V3=False,             # v3: every change below is used only when this is set (V3_OVERRIDES)
-    DT_V0_FRAC_HEAVY=(0.65, 0.85),   # v3: desired speed of trucks and buses, fraction of the limit
-    DT_MIN_V0_FRAC=0.6,      # v3: no vehicle targets less than this fraction without a reason in the scene
-    DT_FOLLOW_GAP_S=2.0,     # v3: "follow" and lead causes bind within this bumper time gap at the ego's speed
-    DT_OVERTAKE_V0_FRAC=(0.60, 0.75),   # v3: an overtaken lead drives at this fraction of the limit
-    DT_OVERTAKE_EGO_FRAC=(0.90, 0.97),  # v3: ... and the overtaking ego at this one
-    DT_ONCOMING_MIN=2.0,     # v3: oncoming headway = this minimum (s) ...
-    DT_ONCOMING_MEAN=(4.0, 8.0),        # v3: ... plus an exponential tail with a mean drawn here per clip (s)
-    DT_LEFT_SHARE=0.35,      # v3: share of a signal4 approach's traffic in its left-only lane
+    # ---- leads, gaps and lanes (docs/version-3-revision.md) ----
+    DT_V0_FRAC_HEAVY=(0.65, 0.85),   # desired speed of trucks and buses, fraction of the limit
+    DT_MIN_V0_FRAC=0.6,      # no vehicle targets less than this fraction without a reason in the scene
+    DT_FOLLOW_GAP_S=2.0,     # "follow" and lead causes bind within this bumper time gap at the ego's speed
+    DT_OVERTAKE_V0_FRAC=(0.60, 0.75),   # an overtaken lead drives at this fraction of the limit
+    DT_OVERTAKE_EGO_FRAC=(0.90, 0.97),  # ... and the overtaking ego at this one
+    DT_ONCOMING_MIN=2.0,     # oncoming headway = this minimum (s) ...
+    DT_ONCOMING_MEAN=(4.0, 8.0),        # ... plus an exponential tail with a mean drawn here per clip (s)
+    DT_LEFT_SHARE=0.35,      # share of a signal4 approach's traffic in its left-only lane
 
     SEED=0,
 )
 
-# v3 builds: the switch plus the prompter starts (D6): a full stop of 0.8 s at a stop sign and
-# 0.2 to 0.6 s before moving off once the way is clear
-V3_OVERRIDES = dict(DT_V3=True, R4_STOP_TIME=0.8, DT_START_DELAY=(0.2, 0.6),
-                    SIG_ARROW=(6.0, 8.0))   # Issue 4: half of the maps keep a 6 to 8 s green arrow

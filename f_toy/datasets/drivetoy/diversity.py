@@ -1,4 +1,4 @@
-"""DriveToy v2 diversity labels (DATASETv2_plan.md, "Diversity"). Every clip gets exactly one
+"""DriveToy diversity labels (README, "Diversity"). Every clip gets exactly one
 label per aspect, computed from its labels of frames 0 to 31 alone:
 
 A  traffic light   the ego's governing light (its approach group) over the clip
@@ -106,7 +106,6 @@ def _cut_ins(rec, T):
     return out
 
 
-FOLLOW_GAP = _CFG["DT_FOLLOW_GAP"]     # speed label "follow": the leader binds within 7 m
 LEAD_GAP = _CFG["DT_LEAD_GAP"]         # causes "lead vehicle", "parked obstacle": within 10 m
 CUTIN_GAP_S = _CFG["DT_CUTIN_GAP_S"]   # cause "cut-in vehicle": within a 2 s time gap
 
@@ -123,19 +122,15 @@ def follow_binds(rec, f, y, gap_m, gap_s=0.0):
 
 
 def follow_gaps(cfg=None):
-    """(metres, seconds) within which the speed label "follow" binds: 7 m, or in v3 a bumper gap
-    of at most DT_FOLLOW_GAP_S (2 s) at the ego's speed."""
-    if cfg is not None and cfg.get("DT_V3"):
-        return 0.0, float(cfg["DT_FOLLOW_GAP_S"])
-    return FOLLOW_GAP, 0.0
+    """(metres, seconds) within which the speed label "follow" binds: a bumper gap of at most
+    DT_FOLLOW_GAP_S (2 s) at the ego's speed."""
+    return 0.0, float((cfg or _CFG)["DT_FOLLOW_GAP_S"])
 
 
 def lead_gaps(cfg=None):
     """(metres, seconds) for the causes "lead vehicle", "parked obstacle" and the overtake check:
-    10 m, or in v3 10 m or 2 s, whichever is larger."""
-    if cfg is not None and cfg.get("DT_V3"):
-        return LEAD_GAP, float(cfg["DT_FOLLOW_GAP_S"])
-    return LEAD_GAP, 0.0
+    10 m or 2 s, whichever is larger."""
+    return LEAD_GAP, float((cfg or _CFG)["DT_FOLLOW_GAP_S"])
 
 
 def overtake_problems(rec, T, cfg=None):

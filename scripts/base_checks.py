@@ -9,7 +9,7 @@
 5. with --resim: every sample re-simulated from its sim_seed and target must equal its labels,
    and rules.check must find no violations.
 
-    python scripts/v2s_checks.py /root/projects/drive_v2s/pilot [--resim]
+    python scripts/base_checks.py /root/projects/drive_v3/val [--resim]
 
 Writes <split>/checks.json.
 """

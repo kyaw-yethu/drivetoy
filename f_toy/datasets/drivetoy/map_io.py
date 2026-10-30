@@ -1,4 +1,4 @@
-"""The ``map`` label (version-3-revision.md, Issue 7): a sample's static road map as JSON.
+"""The ``map`` label (docs/version-3-revision.md, Issue 7): a sample's static road map as JSON.
 
 ``map_to_dict(m)`` keeps every attribute of the RoadMap and its lanes (centrelines with their arc
 length, heading and curvature, successors, neighbours, speed limits and zones, solid-line

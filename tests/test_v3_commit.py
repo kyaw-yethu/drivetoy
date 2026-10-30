@@ -9,12 +9,12 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from f_toy.datasets.drivetoy.choices import CHOICE_KINDS
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG, V3_OVERRIDES
+from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
 from f_toy.datasets.drivetoy.rules import check
 from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
 from f_toy.datasets.drivetoy.sim import EV, RS
 
-V3 = dict(CFG, **V3_OVERRIDES, DT_FORKS=4, DT_KEEP_FORK_RECS=True)
+V3 = dict(CFG, DT_FORKS=4, DT_KEEP_FORK_RECS=True)
 GO_KINDS = {CHOICE_KINDS.index("left_gap"), CHOICE_KINDS.index("rtor")}
 WAVE = CHOICE_KINDS.index("stop_wave")
 
@@ -103,13 +103,13 @@ def _stop_job(job):
 
 
 def test_prompt_stop_sign():
-    v2_timing = dict(CFG, DT_V3=True)   # v3 without the prompter starts
+    slow = dict(CFG, R4_STOP_TIME=1.0, DT_START_DELAY=(0.3, 1.5))   # a 1 s stop and slower starts, for contrast
     with Pool(32) as p:
-        v3 = [x for x in p.map(_stop_job, [(s, dict(CFG, **V3_OVERRIDES)) for s in range(40)]) if x is not None]
-        old = [x for x in p.map(_stop_job, [(s, v2_timing) for s in range(40)]) if x is not None]
-    print(f"frames standing at a clear stop sign: v3 max {max(v3)} mean {np.mean(v3):.1f} (n {len(v3)}); "
-          f"v2 timing max {max(old)} mean {np.mean(old):.1f} (n {len(old)})")
-    assert len(v3) >= 10 and max(v3) <= 9 and max(old) > 9
+        prompt = [x for x in p.map(_stop_job, [(s, CFG) for s in range(40)]) if x is not None]
+        late = [x for x in p.map(_stop_job, [(s, slow) for s in range(40)]) if x is not None]
+    print(f"frames standing at a clear stop sign: max {max(prompt)} mean {np.mean(prompt):.1f} (n {len(prompt)}); "
+          f"with slower timing max {max(late)} mean {np.mean(late):.1f} (n {len(late)})")
+    assert len(prompt) >= 10 and max(prompt) <= 9 and max(late) > 9
 
 
 if __name__ == "__main__":
