@@ -2,7 +2,24 @@
 
 The task encoders' planned trajectories are scored on DriveToy with five terms of NAVSIM v2's EPDMS and one DriveToy term, traffic rule compliance (TRC), which replaces its traffic light compliance.
 
-## Score
+## ADE Evaluation
+
+Two numbers summarize each encoder's path over the full 6.4 s (frames 32 to 63). Both treat all 16 futures as acceptable and compare positions in the ego frame at frame 31.
+
+**1. Top-1 ADE to the nearest future.** The encoder's most probable path is where it says the ego should go, so it is compared with the closest of the 16 futures $f_1, \dots, f_{16}$ and averaged over clips:
+
+$$\text{ADE}_\text{near} = \min_{j} \frac{1}{32} \sum_{t=32}^{63} \lVert \hat{p}_t - f_{j,t} \rVert$$
+
+A path that follows any one future scores 0, while a path between futures that split matches none of them and scores poorly.
+
+**2. Distribution match over distinct outcomes.** A vocabulary encoder's probabilities over its $K$ paths should put noticeable mass on every distinct outcome among the 16 futures and little mass anywhere else; how the mass is balanced among the outcomes does not matter. This follows precision and recall for generative models (Sajjadi et al., 2018; Kynkäänniemi et al., 2019).
+
+- The 16 futures of a clip are clustered with complete linkage at 2 m ADE into $G$ outcomes, so speed variants of one path form one outcome, while going straight and turning right form two.
+- Each vocabulary path's probability goes to the outcome of its nearest future if that future is within 2 m ADE, giving a mass $m_g$ per outcome; the remaining mass $m_\text{off}$ lies on paths that no future follows.
+- Precision is $1 - m_\text{off}$, reported on all clips.
+- Recall is $\frac{1}{G} \sum_{g} \min(m_g / \tau,\ 1)$ with $\tau = 0.1$, so an outcome with at least 0.1 of the mass gets full credit. It is reported on clips with two or more outcomes, 163 of the 1,500 `drive_v2s` val clips, with $\tau = 0.05$ alongside as a check.
+
+## NAVSIM-style Evaluation
 
 Each plan covers the 4 s after frame 31 (frames 32 to 51). As in NAVSIM, it is interpolated to 10 Hz and tracked by NAVSIM's LQR controller and kinematic bicycle model, and every term reads the tracked states.
 
@@ -56,7 +73,7 @@ Other road users replay their logged motion, as in NAVSIM's first stage. A plan 
 
 ## Report
 
-For each encoder and reference: the mean score, the mean of each term, and the share of samples that break each TRC rule, overall and by cause (aspect B), choice state (aspect E) and template.
+For each encoder and reference: the mean score, the mean of each term, and the share of samples that break each TRC rule, overall and by cause (aspect B), choice state (aspect E) and template. The two trajectory headlines are reported overall and by light (aspect A) and cause (aspect B), the second only for vocabulary encoders.
 
 ## Inputs and Code
 
