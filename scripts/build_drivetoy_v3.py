@@ -20,7 +20,7 @@ from f_toy.datasets.drivetoy.builder import build_to_disk
 from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG, V3_OVERRIDES
 
 SPLITS = dict(pilot=(500, 30_000_000, 1), train=(10_000, 0, 1), val=(1_500, 20_000_000, 1), test=(1_500, 10_000_000, 2),
-              smoke=(8, 40_000_000, 1), pilot2=(500, 50_000_000, 1))
+              smoke=(8, 40_000_000, 1))
 
 
 def main():

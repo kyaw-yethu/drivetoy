@@ -225,9 +225,9 @@ Each sample stores, per major choice, its frame, chooser, cue value, drawn proba
 
 ## Build
 
-Pending clips come from nine recipe variants, one per kind of choice: yellow onset, permissive left, right turn on red, stop-sign near tie, lane-end merge, cut-in, overtake, pedestrian at the curb and parked car. Each sets the cue up so the choice falls in frames 32 to 40 (`scripts/v2s_combos.py` reports, per target combination, how often it comes out as planned). The builder rejects any candidate whose record breaks a traffic rule.
+Pending clips come from nine recipe variants, one per kind of choice: yellow onset, permissive left, right turn on red, stop-sign near tie, lane-end merge, cut-in, overtake, pedestrian at the curb and parked car. Each sets the cue up so the choice falls in frames 32 to 40. The builder rejects any candidate whose record breaks a traffic rule.
 
-A 500-clip pilot passed every check before the full build. `drive_v3/run_all.sh` builds val, test and train on four GPUs in about 8.7 h, then runs the checks and writes the GIFs.
+`scripts/run_all.sh` builds val, test and train on four GPUs in about 8.7 h, then runs the checks and writes the GIFs. A 500-clip pilot passed every check before the full build.
 
 ### Built data
 
@@ -254,12 +254,16 @@ The "didn't go" rule counts once the ego has stood for 1 s while `may_go` is 1 (
 
 ![One pending val clip per kind of choice; the map runs on to frame 40](pending_v3.gif)
 
+==========
 ![Four futures of pending val clips, forked at frame 31](forks_v3.gif)
 
 ## Scripts and tests
 
+- `scripts/run_all.sh [out_dir]`: the full build into `out_dir` (default `/root/projects/drive_v3`), with status lines in `<out_dir>/logs/status.log`.
 - `scripts/build_drivetoy_v3.py --split <train|val|test> --gpus 0,1,2,3`: builds a split into `/root/projects/drive_v3/<split>` (simulation, then rendering) and resumes where it stopped.
 - `scripts/v3_checks.py <split> [--resim]`: the checks above, written to `<split>/checks.json`.
 - `scripts/v2s_viz.py <split> --out <dir> --suffix v3`: `diversity_<aspect>_v3.gif` (A to E, one clip per label), `pending_v3.gif` (one pending clip per kind of choice) and `forks_v3.gif` (four futures of a pending clip, forked at frame 31).
 - `scripts/v2s_zip.py <folder> <zip>`: the data and code archives.
-- The tests run as plain scripts (`python3 tests/test_v3_leads.py`); `tests/test_v3_regression.py` checks that `DT_V3` off still re-simulates the v2s val samples, needs `drive_v2s/val` from `drive_v2s_data.zip`, and skips without it.
+- The tests run as plain scripts (`python3 tests/test_v3_leads.py`).
+
+The simulator, rule checker, labels and Blender renderer are in `f_toy/datasets/drivetoy/`; Blender 4.2 renders on CUDA GPUs.
