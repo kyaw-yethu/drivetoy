@@ -7,15 +7,7 @@ DriveToy v3 is a procedural driving dataset: a lane-graph traffic simulator (IDM
 - [Data](#data)
 - [Diversity](#diversity)
 - [Stochasticity](#stochasticity)
-  - [Principles](#principles)
-  - [Sampling priority](#sampling-priority)
-  - [Major choices](#major-choices)
-  - [Minor variation](#minor-variation)
-  - [After frame 31](#after-frame-31)
   - [Future sets](#future-sets)
-- [Traffic and scene](#traffic-and-scene)
-- [Labels and checks](#labels-and-checks)
-- [Build](#build)
 - [Scripts and tests](#scripts-and-tests)
 
 ## Data
@@ -139,13 +131,17 @@ The sampler meets A first and treats B, C and D as targets, so the later aspects
 The ego and the road users around it behave stochastically where real drivers differ. Major choices have a few distinct outcomes whose odds follow a cue the video shows, and minor variation comes from per-driver and per-event draws. The task encoder learns from frames 32 to 63, either forecasting them from frames 0 to 31 or forecasting each 8-frame window from the frames before it, so these futures vary where real driving varies and stay predictable where it does not.
 
 
-### Future sets
+## Future sets
 
 Each sample gets 16 futures of frames 32 to 63, forked at frame 31 and stored as states in `future_set.npz`, with future 0 as its own label. When the ego has not signalled by frame 31 and its lane allows several moves, each future also draws the ego's move with equal odds.
 
 ![Four futures of pending val clips, forked at frame 31](assets/forks_v3r.gif)
 
-See more samples about future alternatives at 
+See more samples of future alternatives in [forked-futures.md](docs/forked-futures.md).
+
+# Other Documents
+- See more how 16 future alternatives differ across scenes in -> [forked-futures.md](docs/forked-futures.md)
+- See how each version of drive_toy differ in -> [revision-history.md](docs/revision-history.md)
 
 ## Scripts and tests
 
@@ -155,5 +151,3 @@ See more samples about future alternatives at
 - `scripts/make_gifs.py <split> --out <dir>`: `diversity_<aspect>_v3.gif` (A to E, one clip per label), `pending_v3.gif` (one pending clip per kind of choice) and `forks_v3.gif` (four futures of a pending clip, forked at frame 31). With `--showcase`, it writes instead the six `forks_<category>_v3.gif` of [forked-futures.md](docs/forked-futures.md), four val samples each.
 - `scripts/zip_folder.py <folder> <zip>`: the data and code archives.
 - The tests run as plain scripts (`python3 tests/test_v3_leads.py`).
-
-The simulator, rule checker, labels and Blender renderer are in `drivetoy/`; Blender 4.2 renders on CUDA GPUs.
