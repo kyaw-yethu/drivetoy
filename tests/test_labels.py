@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.diversity import CUTIN_GAP_S, LEAD_GAP, follow_binds, follow_gaps, lead_gaps
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.diversity import CUTIN_GAP_S, LEAD_GAP, follow_binds, follow_gaps, lead_gaps
 
 V3 = dict(CFG)
 

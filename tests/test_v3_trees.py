@@ -6,11 +6,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "f_toy" / "datasets" / "drivetoy" / "blender"))
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "drivetoy" / "blender"))
 import geom
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.export import sightlines
-from f_toy.datasets.drivetoy.roads import build_stop4
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.export import sightlines
+from drivetoy.roads import build_stop4
 
 V3 = dict(CFG)
 

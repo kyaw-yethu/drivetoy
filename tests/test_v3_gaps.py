@@ -7,10 +7,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.roads import build_signal4
-from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
-from f_toy.datasets.drivetoy.sim import EV, Sim
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.roads import build_signal4
+from drivetoy.scenarios import COMBOS, simulate
+from drivetoy.sim import EV, Sim
 
 V3 = dict(CFG, DT_FORKS=1)
 
@@ -45,7 +45,7 @@ def _arrivals(job):
 def test_oncoming_arrivals():
     rows = [r for r in COMBOS if r[2] == "signal4" and (r[0] == "permissive left" or r[6] == "left_gap")]
     with Pool(32) as p:
-        out = [o for o in p.map(_arrivals, [(s, r) for s in range(10) for r in rows]) if o is not None]
+        out = [o for o in p.map(_arrivals, [(s, r) for s in range(14) for r in rows]) if o is not None]
     gaps = [g for o in out for g in o]
     short = float(np.mean(np.array(gaps) < 15))   # below the 3 s gap floor
     print(f"clips {len(out)}; oncoming line crossings {len(gaps) + len(out)}; shortest gaps (frames) {sorted(gaps)[:8]}; "

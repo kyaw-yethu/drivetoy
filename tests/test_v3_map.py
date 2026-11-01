@@ -7,11 +7,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.diversity import clip_labels, cue_problems
-from f_toy.datasets.drivetoy.map_io import load_map, map_from_dict, map_to_dict, save_map
-from f_toy.datasets.drivetoy.rules import check
-from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.diversity import clip_labels, cue_problems
+from drivetoy.map_io import load_map, map_from_dict, map_to_dict, save_map
+from drivetoy.rules import check
+from drivetoy.scenarios import COMBOS, simulate
 
 V3 = dict(CFG, DT_FORKS=1)
 

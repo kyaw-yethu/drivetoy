@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.choices import choice_p, driver_values, end_label, style_c50
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.choices import choice_p, driver_values, end_label, style_c50
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
 
 V3 = dict(CFG)
 
@@ -45,11 +45,13 @@ def test_style_correlation():
 
 
 def test_end_label():
-    row = lambda f, p, rel=1: [f, 0, 0, 3.0, p, 1, rel]
+    row = lambda f, p, rel=1, slot=0, kind=1: [f, slot, kind, 3.0, p, 1, rel]
     assert end_label([row(34, 0.5)]) == "pending"
     assert end_label([row(34, 0.97)]) == "none"            # a foregone choice is not pending
     assert end_label([row(20, 0.6), row(34, 0.95)]) == "decided"
     assert end_label([row(34, 0.5, rel=0)]) == "none"      # someone else's choice
+    assert end_label([row(34, 0.5, slot=7)]) == "none"     # another road user's choice is never pending
+    assert end_label([row(34, 1.0, kind=0)]) == "pending"  # a determined response (yellow) after frame 31
     assert end_label([row(45, 0.5)]) == "none"             # too late to count
     assert end_label(np.zeros((0, 7))) == "none"
 

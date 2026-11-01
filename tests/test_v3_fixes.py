@@ -8,9 +8,9 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy import sim
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
+from drivetoy import sim
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.scenarios import COMBOS, simulate
 
 V3 = dict(CFG)
 
@@ -22,7 +22,8 @@ def test_time_to_cover():
 
 
 def _route_job(seed):
-    row = [r for r in COMBOS if r[6] == "rtor" and r[5] == "pending"][seed % 2]
+    rows = [r for r in COMBOS if r[6] == "rtor" and r[5] == "pending"]
+    row = rows[seed % len(rows)]
     A, B, tmpl, D, C, E, V = row
     res = simulate(9000 + seed, dict(V3, DT_FORKS=4), target=dict(A=A, B=B, C=C, D=D, E=E, V=V, template=tmpl))
     if not res["ok"] or res["route_draws"][0] is None:

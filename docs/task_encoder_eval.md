@@ -1,6 +1,19 @@
 # Task-Encoder Trajectory Evaluation
 
-The task encoders' planned trajectories are scored on DriveToy with five terms of NAVSIM v2's EPDMS and one DriveToy term, traffic rule compliance (TRC), which replaces its traffic light compliance.
+The task encoders' planned trajectories are scored on DriveToy with five terms of NAVSIM v2's EPDMS and one DriveToy term, traffic rule compliance (TRC), which replaces its traffic light compliance. Each encoder is scored through its own trajectory head.
+
+## Encoders
+
+Every encoder is a V-JEPA 2 ViT-L trained on the `drive_v3` train clips.
+
+| Encoder | Training | Head |
+|---|---|---|
+| SSL | The released V-JEPA 2 with 30 more epochs of V-JEPA self-supervised training on the train videos. | None of its own; global heads with $K=256$ and $K=1024$ are trained on the frozen encoder by the fine-tuning recipe. |
+| Global $K=256$ | SSL, then fine-tuned end to end with its head. | Soft cross-entropy over a 256-path vocabulary of the 32 frames after frame 31. |
+| Global $K=1024$ | SSL, then fine-tuned end to end with its head. | The same with a 1,024-path vocabulary. |
+| Local $K=256$ | SSL, then fine-tuned end to end with its head. | Soft cross-entropy over a 256-path vocabulary of the 16 frames after frames 7, 15, 23 and 31. |
+
+Each model is scored at its best checkpoint. A head's most probable path is the encoder's plan, and its probabilities are the encoder's distribution over its vocabulary. The local head plans 16 frames (3.2 s) from frame 31, so its ADE evaluation uses those 16 frames with the outcome radius scaled to 1.06 m, and it is left out of the NAVSIM-style evaluation, whose plans need 4 s.
 
 ## ADE Evaluation
 
@@ -12,12 +25,12 @@ $$\text{ADE}_\text{near} = \min_{j} \frac{1}{32} \sum_{t=32}^{63} \lVert \hat{p}
 
 A path that follows any one future scores 0, while a path between futures that split matches none of them and scores poorly.
 
-**2. Distribution match over distinct outcomes.** A vocabulary encoder's probabilities over its $K$ paths should put noticeable mass on every distinct outcome among the 16 futures and little mass anywhere else; how the mass is balanced among the outcomes does not matter. This follows precision and recall for generative models (Sajjadi et al., 2018; Kynkäänniemi et al., 2019).
+**2. Distribution match over distinct outcomes.** A head's probabilities over its $K$ paths should put noticeable mass on every distinct outcome among the 16 futures and little mass anywhere else; how the mass is balanced among the outcomes does not matter. This follows precision and recall for generative models (Sajjadi et al., 2018; Kynkäänniemi et al., 2019).
 
 - The 16 futures of a clip are clustered with complete linkage at 2 m ADE into $G$ outcomes, so speed variants of one path form one outcome, while going straight and turning right form two.
 - Each vocabulary path's probability goes to the outcome of its nearest future if that future is within 2 m ADE, giving a mass $m_g$ per outcome; the remaining mass $m_\text{off}$ lies on paths that no future follows.
 - Precision is $1 - m_\text{off}$, reported on all clips.
-- Recall is $\frac{1}{G} \sum_{g} \min(m_g / \tau,\ 1)$ with $\tau = 0.1$, so an outcome with at least 0.1 of the mass gets full credit. It is reported on clips with two or more outcomes, 163 of the 1,500 `drive_v2s` val clips, with $\tau = 0.05$ alongside as a check.
+- Recall is $\frac{1}{G} \sum_{g} \min(m_g / \tau,\ 1)$ with $\tau = 0.1$, so an outcome with at least 0.1 of the mass gets full credit. It is reported on clips with two or more outcomes, 330 of the 1,500 `drive_v3` val clips, with $\tau = 0.05$ alongside as a check.
 
 ## NAVSIM-style Evaluation
 
@@ -56,13 +69,12 @@ Collisions are left to NC, which counts only at-fault ones.
 
 ## Plans
 
-- The encoders with a 32-frame (6.4 s) head are scored: `g16_query`, `causal_global`, `ssl` (global head) and the frozen released V-JEPA 2. The local heads plan only 8 frames (1.6 s) and are left out.
-- Each encoder predicts four modes with probabilities. The plan is the most probable mode, cut to its first 20 frames; the probability-weighted mean of the four modes' scores is reported beside it.
-- For EC, each encoder also plans from frames 0 to 29, 0.4 s before frame 31 and the nearest frame to NAVSIM's 0.5 s. Encoders trained only on 32-frame inputs get frame 0 repeated twice at the start.
+- The plan is the most probable path of the encoder's own head, cut to its first 20 frames. Beside it is the probability-weighted mean score of the most probable paths that together hold 90% of the mass, at most 16, with their probabilities renormalized.
+- For EC, each encoder also plans from frames 0 to 29, 0.4 s before frame 31 and the nearest frame to NAVSIM's 0.5 s. The input gets frame 0 repeated twice at the start, so every encoder still sees 32 frames, and its own head reads it.
 
 ## Futures and the Human Filter
 
-Other road users replay their logged motion, as in NAVSIM's first stage. A plan is scored against each of the sample's 16 futures, and its score is the mean over them, since all 16 continue frames 0 to 31 equally well. Within each future, a term that the future's own ego fails after the same conversion scores 1 for the plan, which is NAVSIM's human filter.
+Other road users replay their logged motion, as in NAVSIM's first stage. A plan is scored against each of the sample's 16 futures, and its score is the mean over them, since all 16 continue frames 0 to 31 equally well. Within each future, a term that the future's own ego fails after the same conversion scores 1 for the plan, which is NAVSIM's human filter. For TRC the filter applies rule by rule.
 
 ## References
 
@@ -73,8 +85,14 @@ Other road users replay their logged motion, as in NAVSIM's first stage. A plan 
 
 ## Report
 
-For each encoder and reference: the mean score, the mean of each term, and the share of samples that break each TRC rule, overall and by cause (aspect B), choice state (aspect E) and template. The two trajectory headlines are reported overall and by light (aspect A) and cause (aspect B), the second only for vocabulary encoders.
+For each encoder and reference: the mean score, the mean of each term, and the share of samples that break each TRC rule, overall and by cause (aspect B), choice state (aspect E) and template. The two trajectory headlines are reported overall and by light (aspect A) and cause (aspect B).
 
 ## Inputs and Code
 
-The scorer reads each sample's `map` and `may_go` labels (`version-3-revision.md`, Issue 7). On `drive_v2s` val, `scripts/task_encoder_eval/rule_check/rules_eval.py` in Task_specific_JDM_waypoint already re-simulates each clip for its map and 16 futures, matches the predictions onto the lane graph and runs `rules.check`. Every term except "didn't go when the way was clear" can therefore be computed there before drivetoy_v3 is built. NAVSIM's scorer runs in its own CPU conda env.
+The scorer is `bench/` in this repo and runs in a CPU conda env with NAVSIM v2 and nuplan-devkit v1.2 (`bench/setup_env.sh`). It reads each sample's `map` and `may_go` labels (`revision-history.md`, version 3, Issue 7) and the full records of its 16 futures, which `bench/records.py` re-simulates from the sample's seed and target with the code that built the split and checks against the labels and `future_set.npz`.
+
+- `bench/navsim_io.py` builds NAVSIM's inputs. The ego keeps DriveToy's body, with its axles 0.35 of its length before and behind its centre. Lanes widened to 3.5 m, the road pavement and the junction square form the drivable map, and road users with the map's parked cars and cones form the observation, interpolated from 5 Hz to 10 Hz.
+- `bench/trc.py` puts the tracked plan into each future's record, matched onto the lane graph, and runs `rules.check` and the `may_go` rule.
+- `bench/score.py` scores one plans file per source, and `bench/report.py` writes the tables.
+
+A plans file holds, per sample, up to 16 paths of 20 frames with their weights, the plan first, and the plan made at frame 29. `scripts/task_encoder_eval/export_plans.py` in Task_specific_JDM_waypoint writes them for the four global models.

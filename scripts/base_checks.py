@@ -23,10 +23,10 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.choices import CHOICE_KINDS
-from f_toy.datasets.drivetoy.diversity import ASPECTS
-from f_toy.datasets.drivetoy.rules import check
-from f_toy.datasets.drivetoy.scenarios import VARIANTS, simulate
+from drivetoy.choices import CHOICE_KINDS
+from drivetoy.diversity import ASPECTS
+from drivetoy.rules import check
+from drivetoy.scenarios import VARIANTS, simulate
 
 ROOT = META = None
 T0, T1 = 31, 40

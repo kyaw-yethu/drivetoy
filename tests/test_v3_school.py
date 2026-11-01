@@ -7,8 +7,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.roads import LANE_W, build_residential
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.roads import LANE_W, build_residential
 
 V3 = dict(CFG)
 

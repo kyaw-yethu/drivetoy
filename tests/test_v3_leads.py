@@ -8,8 +8,8 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.scenarios import COMBOS, simulate
 
 V3 = dict(CFG, DT_FORKS=1)
 ROWS = [c for c in COMBOS if c[1] == "lead vehicle"]
@@ -53,7 +53,8 @@ def test_v3_leads():
 
 
 def _stream_job(seed):
-    row = [r for r in COMBOS if r[2] == "residential" and r[6] == "nudge"][seed % 2]
+    rows = [r for r in COMBOS if r[6] in ("left_gap", "rtor")]   # scripted oncoming and cross traffic
+    row = rows[seed % len(rows)]
     A, B, tmpl, D, C, E, V = row
     res = simulate(1500 + seed, V3, target=dict(A=A, B=B, C=C, D=D, E=E, V=V, template=tmpl))
     if not res["ok"]:
@@ -64,7 +65,7 @@ def _stream_job(seed):
 
 
 def test_no_crawling_stream_cars():
-    """Scripted oncoming streams (residential nudge) keep normal desired speeds; the zone slows them."""
+    """Scripted oncoming and cross traffic (pending left turns, right turns on red) keep normal desired speeds."""
     with Pool(16) as p:
         out = [o for o in p.map(_stream_job, range(16)) if o is not None]
     print(f"built {len(out)}; vehicles below 60%: {[x for o in out for x in o]}")

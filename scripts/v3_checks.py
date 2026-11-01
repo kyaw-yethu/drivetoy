@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Checks of a v3 build (docs/version-3-revision.md): the base checks (scripts/base_checks.py), then one
+"""Checks of a v3 build (docs/revision-history.md, version 3): the base checks (scripts/base_checks.py), then one
 entry per issue under "v3" in <split>/checks.json.
 
 1. leads: vehicles whose desired speed is outside their kind's range;
@@ -9,7 +9,10 @@ entry per issue under "v3" in <split>/checks.json.
 5. trees left out of the sightlines (render logs);
 6. samples whose route is drawn per future: futures with several moves, ego indicator before frame 32;
 7. map and may_go labels: files, round trip (with --resim), logged egos breaking "didn't go when the
-   way was clear" as task_encoder_eval.md defines it.
+   way was clear" as task_encoder_eval.md defines it;
+8. docs/constraints.md: pending choices of other road users, the ego standing before its pending
+   choice, outcomes 2 m apart at frame 63, yellow responses alike in every future, and the lane-ends
+   sign's pixels when the ego signals out of a lane that ends.
 
     python scripts/v3_checks.py /root/projects/drive_v3/pilot [--resim]
 """
@@ -25,12 +28,13 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import base_checks
-from f_toy.datasets.drivetoy.choices import CHOICE_KINDS
-from f_toy.datasets.drivetoy.diversity import ASPECTS, clip_labels
-from f_toy.datasets.drivetoy.map_io import load_map
-from f_toy.datasets.drivetoy.rules import check
-from f_toy.datasets.drivetoy.scenarios import VARIANTS, simulate
-from f_toy.datasets.drivetoy.sim import EV, RS
+from drivetoy.checks import didnt_go
+from drivetoy.choices import CHOICE_KINDS
+from drivetoy.diversity import ASPECTS, clip_labels
+from drivetoy.map_io import load_map
+from drivetoy.rules import check
+from drivetoy.scenarios import VARIANTS, simulate
+from drivetoy.sim import EV, RS
 
 ROOT = ANN = META = None
 FPS, T0 = 5, 31
@@ -117,59 +121,53 @@ def _sample(n):
         out["moves"] = sorted(set(out["future_moves"]))
         out["ind_before"] = int(a["lamps"][:T0 + 1, 0, 1:3].sum())
     # 7. didn't go when the way was clear (task_encoder_eval.md), logged ego
-    out["didnt_go"] = _didnt_go(a, m)
+    out["didnt_go"] = didnt_go(a, m)
     return out
 
 
-def _stand_start(v, f):
-    g = f
-    while g > 0 and v[g - 1] < 0.3:
-        g -= 1
-    return g
-
-
-def _didnt_go(a, m):
-    """Frames at which the logged ego has stood still at or before its line for 1 s while may_go
-    was 1 and no stopped vehicle stood within 10 m ahead in its lane; at a stop sign the second
-    starts after the 0.8 s full stop, and frames are skipped while a car that stopped before it
-    still waits at another approach."""
-    ag, lane, sl, mg = a["agents"], a["lane"], a["s_local"], a["may_go"]
-    v = ag[:, :, 4]
-    run, hits = 0, []
-    for f in range(ag.shape[0]):
-        lid = int(lane[f, 0])
-        if mg[f] != 1 or v[f, 0] >= 0.3 or lid < 0:
-            run = 0
+def _constraints():
+    """Section 8, from the stored labels and futures."""
+    dec, ego, rs = ANN["decisions"], ANN["ego"], ANN["rule_state"]
+    fdec, fego, fturn = FS["decisions"], FS["ego"], FS["ego_turn"]
+    Y, W = CHOICE_KINDS.index("yellow"), CHOICE_KINDS.index("stop_wave")
+    others = n_two = distinct = n_yel = yel_same = 0
+    stand = []
+    for n in range(len(dec)):
+        d = dec[n]
+        late = d[(d[:, 0] > T0) & (d[:, 0] <= 40) & (d[:, 6] > 0)]
+        others += int(((late[:, 1] != 0) & (late[:, 4] >= 0.1) & (late[:, 4] <= 0.9)).any())
+        mine = late[(late[:, 1] == 0) & (((late[:, 4] >= 0.1) & (late[:, 4] <= 0.9)) | (late[:, 2] == Y))]
+        if not len(mine):
             continue
-        ahead = [s for s in range(1, ag.shape[1]) if ag[f, s, 9] > 0 and int(lane[f, s]) == lid and v[f, s] < 0.3
-                 and 0 < sl[f, s] - sl[f, 0] <= 10.0 + (ag[f, s, 6] + ag[f, 0, 6]) / 2]
-        if ahead:
-            run = 0
-            continue
-        ln = m.lanes[lid]
-        if ln.kind != "in" or ln.stop is None or sl[f, 0] + ag[f, 0, 6] / 2 > ln.stop["s"] + 0.5:
-            run = 0   # not at or before its stop line
-            continue
-        stop_sign = ln.stop["control"] == "stop"
-        if stop_sign:
-            mine = _stand_start(v[:, 0], f)
-            first = False
-            for s in range(1, ag.shape[1]):
-                ls = int(lane[f, s])
-                if ag[f, s, 9] <= 0 or ls < 0 or v[f, s] >= 0.3:
-                    continue
-                o = m.lanes[ls]
-                if o.kind == "in" and o.stop is not None and o.leg != ln.leg and \
-                        o.stop["s"] - (sl[f, s] + ag[f, s, 6] / 2) <= 6.0 and _stand_start(v[:, s], f) < mine:
-                    first = True
-                    break
-            if first:
-                run = 0
-                continue
-        run += 1
-        if run >= 5 + (4 if stop_sign else 0):
-            hits.append(f)
-    return hits
+        f1, kind = int(mine[0, 0]), int(mine[0, 2])
+        st = (ego[n, :f1, 3] < 0.3) & (rs[n, :f1, 0] != RS["FOLLOW"])
+        stand.append(max(int(st.sum()) - 4, 0))
+        groups = {}
+        for k in range(fdec.shape[1]):
+            g = fdec[n, k]
+            g = g[(g[:, 0] > T0) & (g[:, 1] == 0) & (g[:, 2] == kind)]
+            if len(g):
+                key = (1, int(fturn[n, k])) if kind == W and g[0, 5] == 1 else int(g[0, 5])
+                groups.setdefault(key, []).append(fego[n, k, -1, :2])
+        if kind == Y:
+            n_yel += 1
+            yel_same += len(groups) <= 1
+        elif len(groups) > 1:
+            n_two += 1
+            keys = list(groups)
+            distinct += all(min(np.hypot(*(a - b)) for a in groups[x] for b in groups[y]) >= 2.0
+                            for i, x in enumerate(keys) for y in keys[i + 1:])
+    px, other_sign = [], META["cues"].index("other_sign")
+    merge = (np.asarray(ANN["template"]) == META["templates"].index("multilane")) & \
+        (np.asarray(ANN["diversity"])[:, 1] == ASPECTS["B"].index("lane end"))
+    for n in np.flatnonzero(merge):
+        on = [int(e[0]) for e in ANN["events"][n] if e[1] == EV["TURN_ON"] and e[2] == 0 and 0 <= e[0] <= 31]
+        if on:
+            px.append(int(ANN["cue_visibility"][n, on[0], other_sign]))
+    return dict(others_pending=others, ego_standing_before_pending=dict(n=len(stand), mean=round(float(np.mean(stand)), 2) if stand else None,
+                                                                       max=max(stand) if stand else None),
+                outcomes_2m_apart=f"{distinct}/{n_two}", yellow_alike_in_all_futures=f"{yel_same}/{n_yel}",
+                lane_end_sign_px_at_indicator=dict(n=len(px), under_25=sum(p < 25 for p in px), min=min(px) if px else None))
 
 
 def _roundtrip(n):
@@ -234,6 +232,7 @@ def main():
                          didnt_go_31_51=sum(any(31 <= f <= 51 for f in h) for h in dg),
                          didnt_go_any=sum(bool(h) for h in dg),
                          didnt_go_examples=[(n, h[:4]) for n, h in enumerate(dg) if h][:10]),
+        "8_constraints": _constraints(),
     }
     if resim:
         with Pool(20, initializer=_init, initargs=(root,)) as p:

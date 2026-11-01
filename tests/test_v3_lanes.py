@@ -6,9 +6,9 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.roads import LANE_W, _rot, build_signal4
-from f_toy.datasets.drivetoy.sim import Sim, Signals
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.roads import LANE_W, _rot, build_signal4
+from drivetoy.sim import Sim, Signals
 
 V3 = dict(CFG)
 

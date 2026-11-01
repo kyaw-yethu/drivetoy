@@ -8,11 +8,11 @@ from pathlib import Path
 import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
-from f_toy.datasets.drivetoy.choices import CHOICE_KINDS
-from f_toy.datasets.drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
-from f_toy.datasets.drivetoy.rules import check
-from f_toy.datasets.drivetoy.scenarios import COMBOS, simulate
-from f_toy.datasets.drivetoy.sim import EV, RS
+from drivetoy.choices import CHOICE_KINDS
+from drivetoy.config import DRIVETOY_DEFAULT_CFG as CFG
+from drivetoy.rules import check
+from drivetoy.scenarios import COMBOS, simulate
+from drivetoy.sim import EV, RS
 
 V3 = dict(CFG, DT_FORKS=4, DT_KEEP_FORK_RECS=True)
 GO_KINDS = {CHOICE_KINDS.index("left_gap"), CHOICE_KINDS.index("rtor")}
@@ -63,7 +63,7 @@ def _commit_job(job):
                 if fr + 20 < n:
                     go4[0] += 1
                     go4[1] += enter - fr <= 20 or cancel < n
-            elif kind == WAVE:
+            elif kind == WAVE and slot != 0:   # the ego's own stop-sign option: tests/test_stop_options.py
                 nxt = [(int(e[0]), int(e[2])) for e in ev if e[1] == EV["ENTER"] and e[0] > fr]
                 wave[0] += 1
                 wave[1] += not nxt or min(nxt)[1] == slot   # nobody enters before the chooser
