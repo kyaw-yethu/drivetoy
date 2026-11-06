@@ -1,5 +1,4 @@
-"""DriveToy traffic simulator — the rulebook of docs/DRIVETOY.md §2 as agent
-policies on a ``roads.RoadMap``.
+"""DriveToy traffic simulator: the rulebook as agent policies on a ``roads.RoadMap``.
 
 Vehicles follow IDM along a route of lanes; every rule is an extra IDM
 obstacle (a virtual stopped car at the stop line, at the crosswalk, ...),
@@ -35,7 +34,7 @@ MAY_GO_REASONS = ["", "light", "oncoming", "pedestrian", "conflict", "stop_order
 EVENTS = ["SIGNAL", "TURN_ON", "LC_START", "STOP", "GO", "YIELD", "ENTER", "PED_DECIDE", "PED_CROSS",
           "LET_IN", "INDICATOR_OFF", "VIOLATE", "WAVE", "CANCEL"]
 
-# Violation sets (docs/DRIVETOY.md §9): DT_VIOLATION switches one rule off for
+# Violation sets: DT_VIOLATION switches one rule off for
 # every agent after DT_BRANCH_FRAME, so the context stays lawful. Each illegal
 # act is logged as a VIOLATE event whose value indexes VIOLATION_RULES — the
 # ground truth the rule checker is scored against.
@@ -392,6 +391,9 @@ class Sim:
             return False
         c50, w = style_c50(self.cfg, kind, u.style)
         p = choice_p(float(cue), c50, w)
+        if getattr(u, "ego", False) and self.cfg.get("DT_EGO_SURE"):
+            # v4: the ego takes every opening its cue offers and waits only when it does not (one draw kept)
+            p = float(float(cue) >= self.cfg["DT_CHOICE"][kind][0])
         out = bool(self.rng.rand() < p)
         self.decisions.append((self.frame + 1, u.slot, CHOICE_KINDS.index(kind), float(cue), p, out,
                                self._ego_rel(u, kind, other)))
@@ -646,10 +648,17 @@ class Sim:
             if mask.any():
                 d = dist[mask]
                 v_curve = np.sqrt(a_lat / np.maximum(ln.curv[mask], 1e-4))
+                cl = getattr(veh, "curve_late", None)
+                if cl is not None:   # a decision scene's ego heeds a curve only within cl m (docs/drivetoy-v4-design.md)
+                    v_curve = np.where(d <= cl, v_curve, np.inf)
                 v_lim = ln.limits()[mask] * frac
-                # reach a lower limit 8 m before its sign, so IDM's lag never shows as speeding
+                zl = getattr(veh, "zone_late", None)
+                if zl is None:   # reach a lower limit 8 m before its sign, so IDM's lag never shows as speeding
+                    v_lim = np.sqrt(v_lim ** 2 + 2 * acc * np.maximum(d - 8.0, 0.0))
+                else:   # a decision scene's ego (docs/drivetoy-v4-design.md) heeds a lower limit only within zl m
+                    v_lim = np.where(d <= zl, v_lim, np.inf)
                 best = min(best, float(np.min(np.sqrt(v_curve ** 2 + 2 * acc * np.maximum(d, 0.0)))),
-                           float(np.min(np.sqrt(v_lim ** 2 + 2 * acc * np.maximum(d - 8.0, 0.0)))))
+                           float(np.min(v_lim)))
             start += ln.length
             if start > 80.0:
                 break
@@ -758,14 +767,23 @@ class Sim:
         cands = [(self._free(veh, v0), RS["GO"] if v0 >= ln.limit_at(sl) * veh.v0f() - 0.3 else RS["SLOW"], -1)]
         if veh.v > v0 + 0.05:   # IDM converges slowly from above; track the target firmly
             cands.append((-2.0 * (veh.v - v0), RS["SLOW"], -1))
+            zb = getattr(veh, "zone_brake", None)
+            if zb is not None:   # a decision scene's ego slows for a late-heeded limit at zb m/s^2 at most
+                cands = [(max(c[0], -zb),) + tuple(c[1:]) for c in cands]
         lead, gap = self._leader(veh, index)
+        pl = getattr(veh, "parked_late", None)
+        if pl is not None and lead is not None and lead.parked and veh.nudge is None and gap > pl:
+            lead, gap = None, np.inf   # a decision scene's ego reacts to a parked car only within pl m
         if lead is not None and lead.parked and ln.kind == "road" and veh.nudge is None:
             if self._plan_nudge(veh, lead, gap, index):
                 lead, gap = self._leader(veh, index)
             elif gap < 45.0:   # wait well behind it, so the detour has room to start
                 gap = gap - 5.0
         if lead is not None:
-            cands.append((self._idm(veh, v0, gap, lead.v), RS["FOLLOW"], lead.slot))
+            acc_l = self._idm(veh, v0, gap, lead.v)
+            if lead.parked and getattr(veh, "brake_at", None) is not None and getattr(self, "parked_stop", True):
+                acc_l = self._stop_acc(veh, v0, gap - veh.s0)   # a decision scene's ego stops steadily behind it
+            cands.append((acc_l, RS["FOLLOW"], lead.slot))
         if veh.lc is not None and veh.lc.get("moving") and veh.lc["tau"] < 0.6:
             # half-way over: the old lane's leader still matters
             best = None
@@ -776,7 +794,8 @@ class Sim:
                 g = best[1] - sl - (veh.L + best[0].L) / 2
                 cands.append((self._idm(veh, v0, g, best[0].v), RS["FOLLOW"], best[0].slot))
 
-        if veh.lc is not None and veh.lc.get("mandatory") and not veh.lc.get("moving") and not veh.lc.get("order"):
+        if veh.lc is not None and veh.lc.get("mandatory") and not veh.lc.get("moving") and not veh.lc.get("order") \
+                and getattr(veh, "end_near", None) is None:
             cands[0] = (self._free(veh, 0.9 * v0), RS["MERGE"], -1)   # signalling out of a lane that ends, it eases off
         if veh.lc is not None and not veh.lc.get("moving") and veh.lc.get("order"):
             side_, slot_, _ = veh.lc["order"]
@@ -812,9 +831,10 @@ class Sim:
                     margin = veh.stop_dist - veh.s0          # it comes to rest stop_dist before the line
                     if why == RS["STOP_SIGN"] and veh.creep and veh.arrival is not None:
                         margin = 0.5 - veh.s0                # after its full stop it creeps up to the line
-                    cands.append((self._idm_stop(veh, v0, d_line - margin), why, other))
+                    if self._brakes(veh, d_line - margin):
+                        cands.append((self._stop_acc(veh, v0, d_line - margin), why, other))
                 if ln.stop["control"] == "signal" and veh.turn == "L" and not veh.granted \
-                        and not self.signals.state(ln.stop["group"], self.t)[1]:
+                        and not self.signals.state(ln.stop["group"], self.t)[1] and getattr(veh, "curve_late", None) is None:
                     # a permissive left approaches slowly enough to still yield at the line
                     v_cap = float(np.sqrt(4.0 ** 2 + 2 * 1.5 * max(d_line - 1.0, 0.0)))
                     cands.append((self._free(veh, min(v0, v_cap)), RS["SLOW"], -1))
@@ -831,7 +851,7 @@ class Sim:
                     continue
                 if (cw in ped_block or cw in ped_entering) and not self._viol("ped"):
                     if veh.v ** 2 / (2 * max(d_cw - 0.5, 0.05)) <= cfg["DT_B_MAX"] and d_cw > 0:
-                        cands.append((self._idm_stop(veh, v0, d_cw - 1.0), RS["YIELD_PED"],
+                        cands.append((self._stop_acc(veh, v0, d_cw - 1.0), RS["YIELD_PED"],
                                       (ped_block.get(cw) or ped_entering.get(cw))))
             if lj.kind == "conn" and veh.entered:
                 for (a, b), (za, zb) in self.m.conflicts.items():
@@ -841,6 +861,8 @@ class Sim:
                     if d_z < 0 or d_z > 25:
                         continue
                     for u, us in index.get(("occ", b), ()):
+                        if (lj.turn, u.slot) in getattr(veh, "compatible", ()):
+                            continue   # a decision scene's ego shares the junction with u on this move
                         zb0, zb1 = self.m.conflicts[(b, a)]
                         # priority to whoever entered the junction first, until it has cleared the zone
                         if us - u.L / 2 <= zb1 + 0.5 and u.enter_time is not None \
@@ -851,7 +873,8 @@ class Sim:
         # ---- lane drop: stop before the end if the merge has not happened ----
         if ln.closed_end:   # it brakes for the end only once the end is near
             d_end = veh.off[i] + ln.length - veh.front
-            if d_end < max(30.0, veh.v ** 2 / (2 * 2.0) + 10.0):
+            near = getattr(veh, "end_near", None)   # a decision scene's merging ego (docs/drivetoy-v4-design.md)
+            if d_end < (max(30.0, veh.v ** 2 / (2 * 2.0) + 10.0) if near is None else near):
                 cands.append((self._idm_stop(veh, v0, d_end - 2.0), RS["MERGE"], -1))
         # zipper: let one signalling merger in
         if not veh.let_in and ln.kind == "road" and not (veh.ego and self.frame >= cfg["DT_CUE_FRAME"]):
@@ -866,6 +889,27 @@ class Sim:
 
     def _idm_stop(self, veh, v0, gap):
         return self._idm(veh, v0, gap, 0.0)
+
+    def _brakes(self, veh, g):
+        """Whether the stop line g metres ahead acts on veh now. A decision scene's ego with ``brake_at``
+        (docs/drivetoy-v4-design.md) holds its speed until a steady stop at the line would need brake_at m/s^2,
+        then brakes; every other vehicle reacts throughout (IDM)."""
+        b = getattr(veh, "brake_at", None)
+        if b is None or getattr(veh, "braking", False):
+            return True
+        if veh.v ** 2 / (2 * max(g, 0.1)) >= b:
+            veh.braking = True
+            return True
+        return False
+
+    def _stop_acc(self, veh, v0, g):
+        """The braking toward a stop line: IDM, or for a ``brake_at`` ego a steady stop over the distance left."""
+        if getattr(veh, "brake_at", None) is None:
+            return self._idm_stop(veh, v0, g)
+        if g <= 0:
+            return -self.cfg["DT_B_MAX"]
+        # a steady stop; below that profile (slowed earlier) it closes up to the line as IDM does
+        return max(-veh.v ** 2 / (2 * max(g, 0.05)), self._idm_stop(veh, v0, g))
 
     def _plan_nudge(self, veh, p, gap, index):
         """A short detour around the double-parked ``p`` ahead, back into the same lane. Where it
@@ -898,9 +942,12 @@ class Sim:
                 if spare < 0.0 or gap > 10.0 or not self.decide(veh, "nudge", spare, key=who.slot, other=who):
                     return False
         s1 = s_c - p.L / 2 - veh.L / 2 - 0.5           # fully out when its front is 0.5 m short of p
-        s0 = max(veh.s, s1 - max(8.0, 1.2 * veh.v))
+        s0 = veh.s if getattr(veh, "parked_late", None) is not None else max(veh.s, s1 - max(8.0, 1.2 * veh.v))
         s2 = s_c + p.L / 2 + veh.L / 2 + 0.5           # back once its rear is 0.5 m past p
-        veh.nudge = dict(slot=p.slot, s=(s0, max(s1, s0 + 3.0), s2, s2 + max(8.0, 1.2 * veh.v)), req=req)
+        back = max(8.0, 1.2 * veh.v)
+        if getattr(veh, "parked_late", None) is not None:   # a decision scene's ego eases back as gently as it pulled out
+            back = max(back, s1 - s0)
+        veh.nudge = dict(slot=p.slot, s=(s0, max(s1, s0 + 3.0), s2, s2 + back), req=req)
         return True
 
     @staticmethod
@@ -1028,8 +1075,8 @@ class Sim:
         if conn.turn == "L" and ln.stop["control"] == "signal" and not arrow:
             if veh.v ** 2 / (2 * max(d_line - 0.5, 0.05)) > 0.8 * cfg["DT_B_MAX"]:
                 veh.granted = True
-        elif not can_stop or d_line < 3.0:
-            veh.granted = True
+        elif (not can_stop or d_line < 3.0) and self.t >= getattr(veh, "hold_until", -np.inf):
+            veh.granted = True   # (a held decision-split car is not let through before its hold ends)
         return True, RS["GO"], -1
 
     def _coming(self, u, index):
@@ -1310,6 +1357,8 @@ class Sim:
             us = usl
             if ul.kind == "in" and u.entered and not u.route_open and ui + 1 < len(u.lanes):
                 uc, us = u.lanes[ui + 1], usl - ul.length   # front over the line, body not yet
+            if (conn.turn, u.slot) in getattr(veh, "compatible", ()):
+                continue   # a decision scene's ego may share the junction with u on this move (docs/drivetoy-v4-design.md)
             if uc is not None:
                 z = self.m.conflicts.get((uc.id, conn.id))
                 if z is not None and us - u.L / 2 <= z[1] + 0.5:
@@ -1393,6 +1442,8 @@ class Sim:
                     veh.lc = dict(side="left", target=ln.left, t_sig=self.t, mandatory=True, moving=False,
                                   lead=_u(self.rng, ml) if ml else self._event_value(veh, "DT_LC_LEAD"),
                                   dur=self._event_value(veh, "DT_LC_DUR"))
+                    if getattr(veh, "merge_dur", None) is not None:   # a decision scene's ego
+                        veh.lc["dur"] = veh.merge_dur
                     veh.indicator, veh.indicator_on_t = 1, self.t
                     self._event("TURN_ON", veh.slot, -1, 1)
                     continue
@@ -1474,6 +1525,13 @@ class Sim:
                     tau, who = self._lc_gap(veh, tgt, sl, index, follower_only=True)
                     if who is not None and not self.decide(veh, "cutin", min(tau, 5.0), key=(who.slot, int(self.t)), other=who):
                         ok = False
+                elif veh.lc.get("overtake") and getattr(veh, "overtake_wait", False):
+                    if ok:   # a decision scene's ego keeps signalling and pulls out once it is safe and the car
+                        # ahead in the target lane is overtake_gap m clear of its front
+                        ahead = [us - sl - (u.L + veh.L) / 2 for u, us in index.get(tgt.id, ()) if u is not veh and us > sl]
+                        ok = not ahead or min(ahead) >= getattr(veh, "overtake_gap", 0.0)
+                    if not ok:
+                        continue
                 elif veh.lc.get("overtake"):
                     # pulling out is chosen now that the move could start, on the gap it would leave (H28);
                     # staying behind, or no safe gap, turns the indicator off and its patience starts again
@@ -1485,8 +1543,9 @@ class Sim:
                         self._event("INDICATOR_OFF", veh.slot)
                         continue
                 if ok and not veh.ego and self.ego is not None and self.frame >= cfg["DT_CUE_FRAME"] \
-                        and self._moves_in_ahead_of_ego(veh, tgt):
-                    ok = False   # nobody moves in ahead of the ego after the last visible frame (H31)
+                        and self._moves_in_ahead_of_ego(veh, tgt) and not veh.lc.get("cued"):
+                    ok = False   # nobody moves in ahead of the ego after the last visible frame (H31), unless its
+                    # move was cued on screen (a decision scene's cut-in, docs/drivetoy-v4-design.md)
                 if ok:
                     if self._viol("no_signal") and self.t - veh.indicator_on_t < cfg["R7_SIGNAL_CHECK"] - 0.25:
                         self._log_violation(veh.slot, "R7")
@@ -1536,7 +1595,7 @@ class Sim:
         """Whether the end of veh's lane shows (H29): a lane-ends sign ahead covers at least
         DT_SIGN_PX of the 128 px view (a diamond 0.8 size m across), or the end is within 50 m."""
         i, sl = veh.where()
-        if veh.lanes[i].length - sl < 50.0:
+        if veh.lanes[i].length - sl < (50.0 if getattr(veh, "end_near", None) is None else veh.end_near):
             return True
         cfg = self.cfg
         f = (cfg["IMG"] / 2) / np.tan(np.deg2rad(cfg["CAM_FOV"] / 2))
@@ -1545,7 +1604,7 @@ class Sim:
         for s in self.m.signs:
             if s["kind"] == "lane_ends":
                 d = float((np.asarray(s["pos"][:2], float) - p) @ fwd)
-                if d > 0.5 and 0.5 * (0.8 * s.get("size", 1.0) * f / d) ** 2 >= cfg["DT_SIGN_PX"]:
+                if d > 0.5 and 0.5 * (0.8 * s.get("size", 1.0) * f / d) ** 2 >= getattr(veh, "sign_px", cfg["DT_SIGN_PX"]):
                     return True
         return False
 
@@ -1576,7 +1635,8 @@ class Sim:
                 return False
         if f is not None:
             g = fg - (veh.L + f.L) / 2
-            if g < 1.0 or self._idm(f, self._v0(f), g, veh.v) < -cfg["R7_FOLLOWER_DECEL_POLICY"]:
+            lim = (veh.lc or {}).get("follower_decel", cfg["R7_FOLLOWER_DECEL_POLICY"])   # a decision scene's cut-in
+            if g < 1.0 or self._idm(f, self._v0(f), g, veh.v) < -lim:
                 return False
         return True
 
@@ -1613,7 +1673,7 @@ class Sim:
         return a_new - a_old + veh.polite * dpol
 
     # ----- ground truth for the violation sets ------------------------------
-    # These follow the rules' *check* definitions (docs/DRIVETOY.md §2), with a
+    # These follow the rules' *check* definitions (rules.py), with a
     # margin, not the stricter policy: an act counts only when it is clearly
     # illegal, so the checker's recall measures misses, not boundary noise.
     def _truth_at_line(self, veh, ln):
@@ -1694,6 +1754,12 @@ class Sim:
         peds about to step onto it (entering)."""
         block, entering = {}, {}
         for p in self.peds:
+            react = getattr(p, "react", None)
+            if react is not None:   # a decision scene's cued pedestrian (docs/drivetoy-v4-design.md): drivers react
+                # to it only once it has been on the crosswalk for ``react`` s
+                if p.state == P_CROSS and self.t >= p.cross_start + react:
+                    block.setdefault(p.cw, p.slot)
+                continue
             if p.state == P_CROSS:
                 block.setdefault(p.cw, p.slot)
             elif p.state == P_WAIT and p.intent == I_CROSS and self._ped_signal_ok(p) and not self._viol("ped_dart") \
@@ -1857,6 +1923,10 @@ class Sim:
         if self.signals is not None and self.signals.update(self.t, self.rng):
             g, ph = self.signals.seq[self.signals.i]
             self._event("SIGNAL", -1, -1, self.signals.i)
+        for veh in self.vehicles:   # a decision scene's car may change its desired speed at a set time
+            va = getattr(veh, "v0_at", None)
+            if va is not None and self.t >= va[0]:
+                veh.v0frac, veh.v0_at = va[1], None
         index = self._lane_index()
         self._lane_changes(index)
         index = self._lane_index()
@@ -1872,13 +1942,24 @@ class Sim:
             accs.append(acc)
         for veh, acc in zip(self.vehicles, accs):
             front0 = veh.front
-            if veh.stopped and acc > 0.05 and not veh.parked:   # start-up delay once it may move off
-                if veh.go_at is None:
-                    veh.go_at = self.t + self._event_value(veh, "DT_START_DELAY")
-                if self.t < veh.go_at:
+            # start-up delay once it may move off; a fixed delay (decision scenes) holds it for any push
+            if veh.stopped and acc > (0.0 if getattr(veh, "start_delay", None) is not None else 0.05) and not veh.parked:
+                if veh.go_at is None:   # a decision scene may fix a driver's start-up delay (docs/drivetoy-v4-design.md)
+                    sd = getattr(veh, "start_delay", None)
+                    veh.go_at = self.t + (self._event_value(veh, "DT_START_DELAY") if sd is None else sd)
+                if self.t < getattr(veh, "hold_until", -np.inf):
+                    acc = -veh.v / dt   # held (a decision scene's car): it halts where it is until hold_until
+                elif self.t < veh.go_at:
                     acc = 0.0
             elif not veh.stopped or acc <= 0.0:
                 veh.go_at = None
+            if getattr(veh, "settle", False) and veh.v < 0.3 and acc <= 0.0:
+                # a decision scene's car comes to a clean rest where it is and stays there (no creeping up)
+                acc = -veh.v / dt
+                i_, sl_ = veh.where()
+                ln_ = veh.lanes[i_]
+                if ln_.kind == "in" and ln_.stop is not None and not veh.entered:
+                    veh.stop_dist = max(float(ln_.stop["s"] - (sl_ + veh.L / 2)), 0.3)
             v_new = max(0.0, veh.v + acc * dt)
             veh.s += 0.5 * (veh.v + v_new) * dt
             veh.v = v_new

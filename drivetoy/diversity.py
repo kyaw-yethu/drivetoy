@@ -134,30 +134,6 @@ def lead_gaps(cfg=None):
     return LEAD_GAP, float((cfg or _CFG)["DT_FOLLOW_GAP_S"])
 
 
-def overtake_problems(rec, T, cfg=None):
-    """For a lane change in frames 0 to T-1 out from behind a leader: the ego must have followed
-    that leader within LEAD_GAP metres for at least BIND_MIN frames before it pulls out, so its
-    cause is the lead vehicle, and pull out at most LEAD_GAP + 2 m behind it."""
-    lc = rec["lc"][:T, 0]
-    if not (lc > 0).any():
-        return []
-    t0 = int(np.argmax(lc > 0))
-    if t0 == 0:
-        return ["lane change already under way at frame 0"]
-    ex, ag = rec["extra"], rec["agents"]
-    y = int(ex[t0 - 1, 0, 4])
-    if int(ex[t0 - 1, 0, 3]) != RS["FOLLOW"] or y <= 0:
-        return ["no leader when the lane change starts"]
-    n = sum(int(ex[f, 0, 3]) == RS["FOLLOW"] and int(ex[f, 0, 4]) == y and follow_binds(rec, f, y, *lead_gaps(cfg))
-            for f in range(t0))
-    out = [f"follows its leader within {LEAD_GAP:.0f} m in {n} frames only"] if n < BIND_MIN else []
-    gap = float(np.hypot(*(ag[t0, y, 1:3] - ag[t0, 0, 1:3]))) - (ag[t0, 0, 6] + ag[t0, y, 6]) / 2
-    gm, gs = lead_gaps(cfg)
-    if gap > max(gm, gs * float(rec["ego"][t0, 3])) + 2.0:
-        out.append(f"pulls out {gap:.0f} m behind the leader")
-    return out
-
-
 def _limit_binds(ln, s, state, ahead=80.0):
     """A lower limit (the school zone) holds the ego below the lane's normal limit: it is inside
     the zone, or slowing (SLOW) for one that starts within ``ahead`` metres."""

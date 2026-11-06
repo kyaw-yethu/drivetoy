@@ -3,7 +3,7 @@
     blender -b --python render_clip.py -- --jobs jobs.txt --gpu 0 [--samples 16]
 
 ``jobs.txt`` holds one ``scene.json<TAB>out.npz`` pair per line (scenes come
-from ``export.write_scene``). For every job the scene is rebuilt from
+from ``export.scene_dict``). For every job the scene is rebuilt from
 procedural low-poly geometry and the clip is rendered from the ego camera
 with Cycles on one CUDA device. ``out.npz`` gets ``video`` (T,H,W,3 uint8)
 and ``index`` (T,H,W int16): the object index under each pixel —

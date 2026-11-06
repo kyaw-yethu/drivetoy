@@ -1,4 +1,4 @@
-"""Road maps for DriveToy's four templates (docs/DRIVETOY.md §4).
+"""Road maps for DriveToy's four templates.
 
 A map is a lane graph plus everything the renderer and the rule checker need
 to know about the static scene. Coordinates are metres, x east, y north;
@@ -393,7 +393,7 @@ def build_stop4(rng, cfg, force_cw=()):
 # Straight roads (multilane, residential)
 # ---------------------------------------------------------------------------
 
-def build_multilane(rng, cfg, **_):
+def build_multilane(rng, cfg, sign_before=None, sign_size=5.0, **_):
     """Northbound 3 lanes (lane 2, the outermost, closes at a cone taper),
     southbound 2. A solid stretch forbids lane changes between lanes 0 and 1."""
     m = RoadMap("multilane")
@@ -434,8 +434,9 @@ def build_multilane(rng, cfg, **_):
     for y in (drop - 60.0, drop - 30.0):
         m.markings.append(dict(style="arrow_merge_left", pts=np.array([[2.5 * LANE_W, y - 4], [2.5 * LANE_W, y]])))
     # two 4 m signs, 100 m and 45 m before the end: each covers 25 px of the view from about 52 m (H29, H47)
-    for d in (100.0, 45.0):
-        m.signs.append(dict(kind="lane_ends", pos=np.array([3 * LANE_W + 1.0, drop - d]), heading=-np.pi / 2, size=5.0))
+    for d in ((100.0, 45.0) if sign_before is None else (2.0 + sign_before,)):   # sign_before: one sign, that far before the cones (decision scenes)
+        m.signs.append(dict(kind="lane_ends", pos=np.array([3 * LANE_W + 1.0, drop - d]), heading=-np.pi / 2,
+                            size=sign_size))   # sign_size: 0.8 * size m across (decision scenes make it smaller)
     m.signs.append(dict(kind="speed", pos=np.array([3 * LANE_W + 1.0, L0 + 30.0]), heading=-np.pi / 2, value=70))
     for i in range(10):   # cone taper closing lane 2
         t = i / 9
@@ -451,7 +452,7 @@ def build_multilane(rng, cfg, **_):
     return m.finish()
 
 
-def build_residential(rng, cfg, school_zone=True, **_):
+def build_residential(rng, cfg, school_zone=True, zone_before=60.0, **_):
     """Two-lane street with parking lanes on both sides, an unsignalised
     crosswalk in a school zone (red pavement, 30 km/h; left out when
     school_zone is False) and parked cars that hide pedestrians stepping out to it."""
@@ -462,7 +463,7 @@ def build_residential(rng, cfg, school_zone=True, **_):
     PK = 2.4
     half = LANE_W + PK
     y_cw = rng.uniform(10.0, 60.0)
-    zone = (y_cw - 60.0, y_cw + 30.0)
+    zone = (y_cw - zone_before, y_cw + (30.0 if zone_before == 60.0 else zone_before))   # decision scenes may lengthen it
     nb = m.add_lane([[LANE_W / 2, L0], [LANE_W / 2, L1]], "road", limit)
     sb = m.add_lane([[-LANE_W / 2, L1], [-LANE_W / 2, L0]], "road", limit)
     if school_zone:

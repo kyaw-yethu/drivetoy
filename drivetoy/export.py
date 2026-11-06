@@ -2,7 +2,6 @@
 (static map geometry, look, camera, and the per-frame states of the
 rendered frames). Plain lists only, so the Blender-side script needs nothing
 from this package."""
-import json
 
 import numpy as np
 
@@ -114,6 +113,3 @@ def scene_dict(result, branch, cfg, seed):
     return sc
 
 
-def write_scene(path, result, branch, cfg, seed):
-    with open(path, "w") as f:
-        json.dump(scene_dict(result, branch, cfg, seed), f)

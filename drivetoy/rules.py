@@ -1,4 +1,4 @@
-"""Rule checker (docs/DRIVETOY.md §2, column "Check").
+"""Rule checker (the "Check" side of the simulator's rulebook).
 
 Works only from what a clip records — per-frame agent states, lamps,
 signal states, lane ids — plus the static map, never from the simulator's

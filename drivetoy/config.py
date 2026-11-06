@@ -1,5 +1,5 @@
 """DriveToy's own defaults — clip geometry, simulator constants and the
-rulebook's parameters (docs/DRIVETOY.md §2), read by the build scripts as
+rulebook's parameters, read by the build scripts as
 ``DRIVETOY_DEFAULT_CFG``.
 
 Rule parameters come in pairs: ``*_POLICY`` is what agents do, ``*_CHECK`` is
@@ -100,6 +100,7 @@ DRIVETOY_DEFAULT_CFG = dict(
     DT_VIEW=("AgX", "AgX - Medium High Contrast"),   # Blender view transform and look
 
     # ---- cued futures and ego-first sampling ----
+    DT_EGO_SURE=True,        # v4: the ego's own choices follow their cue's nominal threshold (no coin flip)
     DT_CUE_FRAME=31,         # last visible frame: hidden variables the ego reacts to are decided by then
     DT_SIGN_PX=25,           # pixels a lane-ends sign covers before a merge out of that lane starts (H29)
     DT_TRIES=30,             # scene attempts per clip while looking for its target labels
