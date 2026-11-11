@@ -169,3 +169,4 @@ python scripts/check_reproduce.py --split val --render 6             # rebuild a
 - `scripts/check_reproduce.py` checks that the code rebuilds the stored data.
 - `scripts/report.py` writes the per-split summary (`report.md` in the data folder).
 - `scripts/clip_gifs.py` and `scripts/twin_gifs.py` make the GIFs above, and `scripts/zip_folder.py` zips a folder for upload.
+- `bench/` scores the planned trajectories of task encoders on the splits with 16 futures, NAVSIM-style; the method is described in `docs/TASK_ENCODER_EVAL.md` of Task_specific_JDM.
